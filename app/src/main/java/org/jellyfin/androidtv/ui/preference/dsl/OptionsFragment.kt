@@ -28,10 +28,11 @@ abstract class OptionsFragment : LeanbackPreferenceFragmentCompat() {
 	private var skippedInitialResume = false
 
 	override fun onCreate(savedInstanceState: Bundle?) {
-		// Refresh all data in async stores
+		// Refresh all data in async stores only if they need updating
 		runBlocking {
 			stores
 				.filterIsInstance<AsyncPreferenceStore<*, *>>()
+				.filter { it.shouldUpdate }
 				.map { async { it.update() } }
 				.awaitAll()
 		}

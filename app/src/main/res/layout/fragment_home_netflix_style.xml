@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- Black background -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#000000" />
+
+    <!-- Background Image positioned in top-right quadrant only -->
+    <org.jellyfin.androidtv.ui.AsyncImageView
+        android:id="@+id/preview_background"
+        android:layout_width="600dp"
+        android:layout_height="450dp"
+        android:layout_alignParentEnd="true"
+        android:layout_alignParentTop="true"
+        android:scaleType="centerCrop"
+        android:visibility="gone"
+        app:crossfadeDuration="0" />
+
+    <!-- Gradient overlay to fade the image edges -->
+    <View
+        android:id="@+id/preview_gradient"
+        android:layout_width="600dp"
+        android:layout_height="450dp"
+        android:layout_alignParentEnd="true"
+        android:layout_alignParentTop="true"
+        android:background="@drawable/home_preview_corner_gradient"
+        android:visibility="gone" />
+
+    <!-- Top Container with Toolbar and Preview -->
+    <LinearLayout
+        android:id="@+id/top_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- Toolbar -->
+        <include
+            android:id="@+id/toolbar"
+            layout="@layout/glassmorphic_toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="80dp" />
+
+        <!-- Preview Section -->
+        <RelativeLayout
+            android:id="@+id/preview_section"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/home_preview_height"
+            android:paddingStart="@dimen/lb_browse_padding_start"
+            android:paddingEnd="@dimen/lb_browse_padding_end"
+            android:paddingTop="4dp"
+            android:paddingBottom="0dp">
+
+            <!-- Content Details -->
+            <LinearLayout
+                android:id="@+id/preview_content"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentStart="true"
+                android:layout_centerVertical="true"
+                android:orientation="vertical"
+                android:layout_marginEnd="48dp"
+                android:maxWidth="600dp">
+
+                <!-- Content Type Badge -->
+                <TextView
+                    android:id="@+id/preview_content_type"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="14sp"
+                    android:textColor="#E5E5E5"
+                    android:textAllCaps="true"
+                    android:letterSpacing="0.1"
+                    android:fontFamily="sans-serif-medium"
+                    android:text="FILM"
+                    android:visibility="gone" />
+
+                <!-- Title -->
+                <TextView
+                    android:id="@+id/preview_title"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="28sp"
+                    android:textColor="@android:color/white"
+                    android:fontFamily="sans-serif-medium"
+                    android:maxLines="2"
+                    android:ellipsize="end"
+                    android:layout_marginTop="8dp" />
+
+                <!-- Metadata (Year, Duration, Rating, etc) -->
+                <LinearLayout
+                    android:id="@+id/preview_metadata_container"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="12dp">
+
+                    <TextView
+                        android:id="@+id/preview_badge_new"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="New"
+                        android:textColor="#46d369"
+                        android:textSize="16sp"
+                        android:fontFamily="sans-serif-medium"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/preview_year"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="16sp"
+                        android:textColor="#E5E5E5"
+                        android:layout_marginStart="8dp" />
+
+                    <TextView
+                        android:id="@+id/preview_age_rating"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="16sp"
+                        android:textColor="#E5E5E5"
+                        android:layout_marginStart="16dp"
+                        android:paddingStart="8dp"
+                        android:paddingEnd="8dp"
+                        android:paddingTop="2dp"
+                        android:paddingBottom="2dp"
+                        android:background="@drawable/rating_badge_background" />
+
+                    <TextView
+                        android:id="@+id/preview_duration"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="16sp"
+                        android:textColor="#E5E5E5"
+                        android:layout_marginStart="16dp" />
+
+                    <TextView
+                        android:id="@+id/preview_quality"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textSize="14sp"
+                        android:textColor="#E5E5E5"
+                        android:layout_marginStart="16dp"
+                        android:paddingStart="6dp"
+                        android:paddingEnd="6dp"
+                        android:paddingTop="2dp"
+                        android:paddingBottom="2dp"
+                        android:background="@drawable/quality_badge_background"
+                        android:visibility="gone" />
+                </LinearLayout>
+
+                <!-- Description -->
+                <TextView
+                    android:id="@+id/preview_description"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="14sp"
+                    android:textColor="#E5E5E5"
+                    android:maxLines="3"
+                    android:ellipsize="end"
+                    android:lineSpacingMultiplier="1.2"
+                    android:layout_marginTop="16dp" />
+
+                <!-- Action Buttons -->
+                <LinearLayout
+                    android:id="@+id/preview_actions"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="16dp"
+                    android:visibility="gone">
+
+                    <Button
+                        android:id="@+id/preview_play_button"
+                        android:layout_width="wrap_content"
+                        android:layout_height="48dp"
+                        android:text="Play"
+                        android:textColor="@android:color/black"
+                        android:backgroundTint="@android:color/white"
+                        android:layout_marginEnd="12dp"
+                        style="@style/Widget.AppCompat.Button" />
+
+                    <Button
+                        android:id="@+id/preview_more_info_button"
+                        android:layout_width="wrap_content"
+                        android:layout_height="48dp"
+                        android:text="More Info"
+                        android:textColor="@android:color/white"
+                        android:backgroundTint="#333333"
+                        style="@style/Widget.AppCompat.Button" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- Preview Image (positioned to the right) -->
+            <org.jellyfin.androidtv.ui.AsyncImageView
+                android:id="@+id/preview_poster"
+                android:layout_width="140dp"
+                android:layout_height="200dp"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:scaleType="centerCrop"
+                android:visibility="gone" />
+
+        </RelativeLayout>
+    </LinearLayout>
+
+    <!-- Content Rows Container (Bottom Half) -->
+    <androidx.fragment.app.FragmentContainerView
+        android:id="@+id/content_view"
+        android:name="org.jellyfin.androidtv.ui.home.HomeRowsFragment"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_below="@id/top_container"
+        android:layout_alignParentBottom="true"
+        android:layout_marginTop="-80dp"
+        android:paddingTop="86dp"
+        android:paddingBottom="24dp"
+        android:clipToPadding="false"
+        android:descendantFocusability="afterDescendants"
+        android:focusable="true"
+        android:focusableInTouchMode="true">
+
+        <requestFocus />
+    </androidx.fragment.app.FragmentContainerView>
+
+</RelativeLayout>

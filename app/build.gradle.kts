@@ -72,6 +72,14 @@ android {
 	testOptions.unitTests.all {
 		it.useJUnitPlatform()
 	}
+
+	packaging {
+		// Exclude libass libraries to fix 16KB page size alignment warning  
+		// This will disable ASS subtitle support until the library is updated
+		jniLibs {
+			excludes += listOf("**/libass.so", "**/libasskt.so")
+		}
+	}
 }
 
 val versionTxt by tasks.registering {

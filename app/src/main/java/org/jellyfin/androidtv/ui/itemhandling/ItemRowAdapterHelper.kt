@@ -84,7 +84,9 @@ fun ItemRowAdapter.retrieveResumeItems(api: ApiClient, query: GetResumeItemsRequ
 					BaseItemDtoBaseRowItem(
 						item,
 						preferParentThumb,
-						isStaticHeight
+						isStaticHeight,
+						BaseRowItemSelectAction.ShowDetails,
+						true // preferSeriesPoster = true for consistent background loading
 					)
 				}
 			)
@@ -171,7 +173,7 @@ fun ItemRowAdapter.retrieveLatestMedia(api: ApiClient, query: GetLatestMediaRequ
 						preferParentThumb,
 						isStaticHeight,
 						BaseRowItemSelectAction.ShowDetails,
-						preferParentThumb,
+						true, // preferSeriesPoster = true for consistent background loading
 					)
 				}
 			)
@@ -279,7 +281,15 @@ fun ItemRowAdapter.retrieveUpcomingEpisodes(api: ApiClient, query: GetUpcomingEp
 
 			setItems(
 				items = response.items,
-				transform = { item, _ -> BaseItemDtoBaseRowItem(item) }
+				transform = { item, _ -> 
+					BaseItemDtoBaseRowItem(
+						item,
+						preferParentThumb,
+						isStaticHeight,
+						BaseRowItemSelectAction.ShowDetails,
+						true // preferSeriesPoster = true for consistent background loading
+					)
+				}
 			)
 
 			if (response.items.isEmpty()) removeRow()
@@ -299,7 +309,15 @@ fun ItemRowAdapter.retrieveSimilarItems(api: ApiClient, query: GetSimilarItemsRe
 
 			setItems(
 				items = response.items,
-				transform = { item, _ -> BaseItemDtoBaseRowItem(item) }
+				transform = { item, _ -> 
+					BaseItemDtoBaseRowItem(
+						item,
+						preferParentThumb,
+						isStaticHeight,
+						BaseRowItemSelectAction.ShowDetails,
+						true // preferSeriesPoster = true for consistent background loading
+					)
+				}
 			)
 
 			if (response.items.isEmpty()) removeRow()

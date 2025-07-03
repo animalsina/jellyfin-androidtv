@@ -21,7 +21,9 @@ import org.jellyfin.androidtv.util.apiclient.parentBackdropImages
 import org.jellyfin.sdk.Jellyfin
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.extensions.imageApi
+import org.jellyfin.sdk.api.client.extensions.userLibraryApi
 import org.jellyfin.sdk.model.api.BaseItemDto
+import org.jellyfin.sdk.model.api.BaseItemKind
 import java.time.Instant
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
@@ -67,7 +69,51 @@ class BackgroundService(
 		_blurBackground.value = true
 
 		// Get all backdrop urls
-		val backdropUrls = (baseItem.itemBackdropImages + baseItem.parentBackdropImages)
+		val backdropImages = mutableListOf<org.jellyfin.androidtv.util.apiclient.JellyfinImage>()
+		
+		// Add item's own backdrops
+		backdropImages.addAll(baseItem.itemBackdropImages)
+		backdropImages.addAll(baseItem.parentBackdropImages)
+		
+		// If this is an episode and we don't have backdrops, try to get series backdrops
+		if (baseItem.type == BaseItemKind.EPISODE && backdropImages.isEmpty()) {
+			// If we have a series ID, try to fetch the series for its backdrops
+			baseItem.seriesId?.let { seriesId ->
+				scope.launch(Dispatchers.IO) {
+					try {
+						val series = api.userLibraryApi.getItem(itemId = seriesId).content
+						val seriesBackdrops = series.itemBackdropImages
+						if (seriesBackdrops.isNotEmpty()) {
+							val seriesBackdropUrls = seriesBackdrops
+								.map { it.getUrl(api) }
+								.toSet()
+							loadBackgrounds(seriesBackdropUrls)
+							return@launch
+						}
+					} catch (e: Exception) {
+						// Fall through to use episode screenshot
+					}
+					
+					// Fallback: use episode's primary image (screenshot)
+					baseItem.imageTags?.get(org.jellyfin.sdk.model.api.ImageType.PRIMARY)?.let { primaryTag ->
+						val screenshotImage = org.jellyfin.androidtv.util.apiclient.JellyfinImage(
+							item = baseItem.id,
+							source = org.jellyfin.androidtv.util.apiclient.JellyfinImageSource.ITEM,
+							type = org.jellyfin.sdk.model.api.ImageType.PRIMARY,
+							tag = primaryTag,
+							blurHash = baseItem.imageBlurHashes?.get(org.jellyfin.sdk.model.api.ImageType.PRIMARY)?.get(primaryTag),
+							aspectRatio = baseItem.primaryImageAspectRatio?.toFloat(),
+							index = null,
+						)
+						val screenshotUrl = setOf(screenshotImage.getUrl(api))
+						loadBackgrounds(screenshotUrl)
+					}
+				}
+				return // Exit early since we're handling this async
+			}
+		}
+		
+		val backdropUrls = backdropImages
 			.map { it.getUrl(api) }
 			.toSet()
 

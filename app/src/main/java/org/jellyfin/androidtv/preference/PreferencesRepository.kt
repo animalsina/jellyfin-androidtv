@@ -28,6 +28,10 @@ class PreferencesRepository(
 	suspend fun onSessionChanged() {
 		// Note: Do not run parallel as the server can't deal with that
 		// Relevant server issue: https://github.com/jellyfin/jellyfin/issues/5261
+		
+		// Update user-specific preference ID first
+		userSettingPreferences.onUserChanged()
+		
 		liveTvPreferences.update()
 		userSettingPreferences.update()
 

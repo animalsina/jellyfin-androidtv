@@ -88,7 +88,7 @@ public class CardPresenter extends Presenter {
         }
 
         public void setItem(BaseRowItem m) {
-            setItem(m, ImageType.POSTER, 130, 150, 150);
+            setItem(m, ImageType.POSTER, mStaticHeight, mStaticHeight, mStaticHeight);
         }
 
         public void setItem(BaseRowItem m, ImageType imageType, int lHeight, int pHeight, int sHeight) {
@@ -344,8 +344,9 @@ public class CardPresenter extends Presenter {
         ViewHolder holder = (ViewHolder) viewHolder;
         holder.setItem(rowItem, mImageType, 130, 150, mStaticHeight);
 
-        holder.mCardView.setTitleText(rowItem.getCardName(holder.mCardView.getContext()));
-        holder.mCardView.setContentText(rowItem.getSubText(holder.mCardView.getContext()));
+        // Titles removed for cleaner card appearance
+        holder.mCardView.setTitleText("");
+        holder.mCardView.setContentText("");
         if (ImageType.POSTER.equals(mImageType)) {
             holder.mCardView.setOverlayInfo(rowItem);
         }

@@ -65,4 +65,8 @@
     <color name="lb_basic_card_info_bg_color">@color/grey</color>
 
     <color name="background_filter">#94101010</color>
+
+    <!-- Glassmorphic Toolbar Colors -->
+    <color name="toolbar_icon_tint">#E6FFFFFF</color>
+    <color name="nav_text_selected">#1A1A1A</color>
 </resources>

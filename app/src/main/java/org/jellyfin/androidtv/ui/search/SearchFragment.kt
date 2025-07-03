@@ -36,6 +36,7 @@ import org.jellyfin.androidtv.util.speech.rememberSpeechRecognizerAvailability
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
 import org.koin.core.parameter.parametersOf
+import timber.log.Timber
 
 class SearchFragment : Fragment() {
 	companion object {
@@ -63,9 +64,16 @@ class SearchFragment : Fragment() {
 			} else {
 				textInputFocusRequester.requestFocus()
 			}
+		}
 
+		LaunchedEffect(Unit) {
 			viewModel.searchResultsFlow.collect { results ->
-				searchFragmentDelegate.showResults(results)
+				try {
+					searchFragmentDelegate.showResults(results)
+				} catch (e: Exception) {
+					// Log error but don't crash the app
+					Timber.e(e, "Error displaying search results")
+				}
 			}
 		}
 
@@ -125,8 +133,13 @@ class SearchFragment : Fragment() {
 								if (requestedFocusDirection != FocusDirection.Up || !isFirstRowSelected) {
 									cancelFocusChange()
 								} else {
-									rowsSupportFragment?.selectedPosition = 0
-									rowsSupportFragment?.verticalGridView?.clearFocus()
+									try {
+										rowsSupportFragment?.selectedPosition = 0
+										rowsSupportFragment?.verticalGridView?.clearFocus()
+									} catch (e: Exception) {
+										Timber.e(e, "Error clearing focus in search results")
+										cancelFocusChange()
+									}
 								}
 							}
 						}

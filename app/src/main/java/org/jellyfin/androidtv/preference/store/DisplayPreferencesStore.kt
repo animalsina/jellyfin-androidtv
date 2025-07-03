@@ -22,8 +22,9 @@ abstract class DisplayPreferencesStore(
 ) : AsyncPreferenceStore<Unit, Unit>() {
 	private var displayPreferencesDto: DisplayPreferencesDto? = null
 	private var cachedPreferences: MutableMap<String, String?> = mutableMapOf()
+	private var lastCommitTime: Long = 0
 	override val shouldUpdate: Boolean
-		get() = displayPreferencesDto == null
+		get() = displayPreferencesDto == null || (System.currentTimeMillis() - lastCommitTime > 30_000)
 
 	override suspend fun commit(): Boolean {
 		if (displayPreferencesDto == null) return false
@@ -36,6 +37,8 @@ abstract class DisplayPreferencesStore(
 					customPrefs = cachedPreferences
 				)
 			)
+			// Record successful commit time to prevent unnecessary updates
+			lastCommitTime = System.currentTimeMillis()
 		} catch (err: ApiClientException) {
 			Timber.e(err, "Unable to save displaypreferences. (displayPreferencesId=$displayPreferencesId, app=$app)")
 			return false
@@ -52,6 +55,7 @@ abstract class DisplayPreferencesStore(
 
 		displayPreferencesDto = null
 		cachedPreferences.clear()
+		lastCommitTime = 0
 
 		return true
 	}
@@ -66,6 +70,8 @@ abstract class DisplayPreferencesStore(
 			}
 			displayPreferencesDto = result
 			cachedPreferences = result.customPrefs.toMutableMap()
+			// Reset commit time when loading fresh data from server
+			lastCommitTime = 0
 
 			return true
 		} catch (err: ApiClientException) {

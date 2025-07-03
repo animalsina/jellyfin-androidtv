@@ -10,4 +10,30 @@
     <fraction name="lb_focus_zoom_factor_xsmall">@fraction/card_scale_focus</fraction>
     <fraction name="lb_focus_zoom_factor_medium">@fraction/card_scale_focus</fraction>
     <fraction name="lb_focus_zoom_factor_large">@fraction/card_scale_focus</fraction>
+
+    <!-- Home screen preview section -->
+    <dimen name="home_preview_height">200dp</dimen>
+    
+    <!-- Netflix-style row spacing -->
+    <dimen name="lb_browse_rows_margin_top">0dp</dimen>
+    <dimen name="lb_browse_rows_margin_bottom">0dp</dimen>
+    <dimen name="lb_browse_item_vertical_spacing">0dp</dimen>
+    <dimen name="lb_browse_item_horizontal_spacing">12dp</dimen>
+    
+    <!-- Override additional Leanback spacing -->
+    <dimen name="lb_browse_row_vmargin">-20dp</dimen>
+    <dimen name="lb_browse_padding_top">0dp</dimen>
+    <dimen name="lb_browse_padding_bottom">0dp</dimen>
+    <dimen name="lb_browse_expanded_row_no_hovercard_bottom_padding">0dp</dimen>
+    <dimen name="lb_browse_rows_fading_edge">0dp</dimen>
+    <dimen name="lb_browse_header_padding_end">0dp</dimen>
+    <dimen name="lb_browse_title_height">0dp</dimen>
+    <dimen name="lb_browse_headers_vertical_margin">0dp</dimen>
+    <dimen name="lb_browse_row_min_height">0dp</dimen>
+    <dimen name="lb_browse_section_header_text_vertical_spacing">-4dp</dimen>
+    
+    <!-- Toolbar navigation buttons -->
+    <dimen name="toolbar_nav_button_height">32dp</dimen>
+    <dimen name="toolbar_nav_button_margin">2dp</dimen>
+    <dimen name="toolbar_nav_button_padding_horizontal">20dp</dimen>
 </resources>

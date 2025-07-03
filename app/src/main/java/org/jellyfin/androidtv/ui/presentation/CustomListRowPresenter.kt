@@ -21,7 +21,11 @@ open class CustomListRowPresenter @JvmOverloads constructor(
 		super.onBindRowViewHolder(holder, item)
 
 		val view = holder.view?.parent as? View ?: return
-		if (topPadding != null) view.setPadding(view.paddingLeft, topPadding, view.paddingRight, view.paddingBottom)
+		if (topPadding != null) view.setPadding(view.paddingLeft, topPadding, view.paddingRight, 0)
+		
+		// Apply negative bottom margin to bring rows closer
+		val params = view.layoutParams as? android.view.ViewGroup.MarginLayoutParams
+		params?.bottomMargin = -40
 
 		// Hide header view when the item doesn't have one
 		holder.headerViewHolder.view.isVisible = !(item is ListRow && item.headerItem == null)

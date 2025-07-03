@@ -53,9 +53,12 @@ class SearchRepositoryImpl(
 			apiClient.itemsApi.getItems(request).content
 		}
 
-		Result.success(result.items)
+		Result.success(result.items ?: emptyList())
 	} catch (e: ApiClientException) {
 		Timber.e(e, "Failed to search for items")
+		Result.failure(e)
+	} catch (e: Exception) {
+		Timber.e(e, "Unexpected error during search")
 		Result.failure(e)
 	}
 }

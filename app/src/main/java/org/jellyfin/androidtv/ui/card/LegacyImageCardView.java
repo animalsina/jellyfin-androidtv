@@ -9,6 +9,9 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
+import android.animation.AnimatorSet;
+import android.animation.ObjectAnimator;
+import android.view.animation.AccelerateDecelerateInterpolator;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -257,5 +260,39 @@ public class LegacyImageCardView extends BaseCardView {
 
     public void showFavIcon(boolean show) {
         binding.favIcon.setVisibility(show ? VISIBLE : GONE);
+    }
+
+    @Override
+    protected void onFocusChanged(boolean gainFocus, int direction, @Nullable android.graphics.Rect previouslyFocusedRect) {
+        super.onFocusChanged(gainFocus, direction, previouslyFocusedRect);
+        
+        if (gainFocus) {
+            // Scale up animation with slight elevation
+            AnimatorSet animatorSet = new AnimatorSet();
+            ObjectAnimator scaleX = ObjectAnimator.ofFloat(this, "scaleX", 1.0f, 1.05f);
+            ObjectAnimator scaleY = ObjectAnimator.ofFloat(this, "scaleY", 1.0f, 1.05f);
+            ObjectAnimator elevationAnim = ObjectAnimator.ofFloat(this, "elevation", 0f, 10f);
+            
+            animatorSet.playTogether(scaleX, scaleY, elevationAnim);
+            animatorSet.setDuration(200);
+            animatorSet.setInterpolator(new AccelerateDecelerateInterpolator());
+            animatorSet.start();
+            
+            // Notify parent to shift siblings
+            if (getParent() != null && getParent() instanceof ViewGroup) {
+                ((ViewGroup) getParent()).requestLayout();
+            }
+        } else {
+            // Scale down animation
+            AnimatorSet animatorSet = new AnimatorSet();
+            ObjectAnimator scaleX = ObjectAnimator.ofFloat(this, "scaleX", 1.05f, 1.0f);
+            ObjectAnimator scaleY = ObjectAnimator.ofFloat(this, "scaleY", 1.05f, 1.0f);
+            ObjectAnimator elevationAnim = ObjectAnimator.ofFloat(this, "elevation", 10f, 0f);
+            
+            animatorSet.playTogether(scaleX, scaleY, elevationAnim);
+            animatorSet.setDuration(150);
+            animatorSet.setInterpolator(new AccelerateDecelerateInterpolator());
+            animatorSet.start();
+        }
     }
 }

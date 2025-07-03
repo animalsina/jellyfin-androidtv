@@ -1,5 +1,6 @@
 package org.jellyfin.androidtv.ui.presentation
 
+import android.util.TypedValue
 import androidx.leanback.widget.RowPresenter
 import timber.log.Timber
 
@@ -22,6 +23,14 @@ class PositionableListRowPresenter : CustomListRowPresenter {
 		if (holder !is ViewHolder) return
 
 		viewHolder = holder
+		
+		// Add horizontal spacing between items
+		val spacingInPixels = TypedValue.applyDimension(
+			TypedValue.COMPLEX_UNIT_DIP,
+			16f,
+			holder.view.context.resources.displayMetrics
+		).toInt()
+		holder.gridView?.setItemSpacing(spacingInPixels)
 	}
 
 	var position: Int

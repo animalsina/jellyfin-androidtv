@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Focused state - scale up with bounce -->
+    <item android:state_focused="true">
+        <set>
+            <objectAnimator
+                android:propertyName="scaleX"
+                android:valueTo="1.03"
+                android:duration="250"
+                android:interpolator="@android:interpolator/overshoot" />
+            <objectAnimator
+                android:propertyName="scaleY"
+                android:valueTo="1.03"
+                android:duration="250"
+                android:interpolator="@android:interpolator/overshoot" />
+            <objectAnimator
+                android:propertyName="translationZ"
+                android:valueTo="4dp"
+                android:duration="250"
+                android:interpolator="@android:interpolator/overshoot" />
+        </set>
+    </item>
+    
+    <!-- Selected state - subtle scale -->
+    <item android:state_selected="true">
+        <set>
+            <objectAnimator
+                android:propertyName="scaleX"
+                android:valueTo="1.02"
+                android:duration="200"
+                android:interpolator="@android:interpolator/accelerate_decelerate" />
+            <objectAnimator
+                android:propertyName="scaleY"
+                android:valueTo="1.02"
+                android:duration="200"
+                android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </set>
+    </item>
+    
+    <!-- Default state -->
+    <item>
+        <set>
+            <objectAnimator
+                android:propertyName="scaleX"
+                android:valueTo="1.0"
+                android:duration="200"
+                android:interpolator="@android:interpolator/accelerate_decelerate" />
+            <objectAnimator
+                android:propertyName="scaleY"
+                android:valueTo="1.0"
+                android:duration="200"
+                android:interpolator="@android:interpolator/accelerate_decelerate" />
+            <objectAnimator
+                android:propertyName="translationZ"
+                android:valueTo="0dp"
+                android:duration="200"
+                android:interpolator="@android:interpolator/accelerate_decelerate" />
+        </set>
+    </item>
+</selector>

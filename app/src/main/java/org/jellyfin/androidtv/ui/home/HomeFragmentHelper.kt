@@ -36,7 +36,16 @@ class HomeFragmentHelper(
 	}
 
 	fun loadResumeVideo(): HomeFragmentRow {
-		return loadResume(context.getString(R.string.lbl_continue_watching), listOf(MediaType.VIDEO))
+		val query = GetResumeItemsRequest(
+			limit = ITEM_LIMIT_RESUME,
+			fields = ItemRepository.itemFields,
+			imageTypeLimit = 1,
+			enableTotalRecordCount = false,
+			mediaTypes = listOf(MediaType.VIDEO),
+			excludeItemTypes = setOf(BaseItemKind.AUDIO_BOOK),
+		)
+
+		return ContinueWatchingHomeFragmentRow(BrowseRowDef(context.getString(R.string.lbl_continue_watching), query, 0, false, true, arrayOf(ChangeTriggerType.TvPlayback, ChangeTriggerType.MoviePlayback)))
 	}
 
 	fun loadResumeAudio(): HomeFragmentRow {
@@ -61,7 +70,7 @@ class HomeFragmentHelper(
 			fields = ItemRepository.itemFields
 		)
 
-		return HomeFragmentBrowseRowDefRow(BrowseRowDef(context.getString(R.string.lbl_next_up), query, arrayOf(ChangeTriggerType.TvPlayback)))
+		return NextUpHomeFragmentRow(BrowseRowDef(context.getString(R.string.lbl_next_up), query, arrayOf(ChangeTriggerType.TvPlayback)))
 	}
 
 	fun loadOnNow(): HomeFragmentRow {
@@ -74,6 +83,43 @@ class HomeFragmentHelper(
 		)
 
 		return HomeFragmentBrowseRowDefRow(BrowseRowDef(context.getString(R.string.lbl_on_now), query))
+	}
+
+	// New row loader methods for Netflix-style rows
+	fun loadRecommendedForYou(userViews: Collection<BaseItemDto>): HomeFragmentRow {
+		return HomeFragmentRecommendedRow.createRecommendedForYouRow(userViews)
+	}
+
+	fun loadTrendingThisWeek(userViews: Collection<BaseItemDto>): HomeFragmentRow {
+		return HomeFragmentPopularRow.createTrendingRow(userViews)
+	}
+
+	fun loadRecentlyReleased(userViews: Collection<BaseItemDto>): HomeFragmentRow {
+		return HomeFragmentPopularRow.createRecentlyReleasedRow(userViews)
+	}
+
+	fun loadPopularMovies(userViews: Collection<BaseItemDto>): HomeFragmentRow {
+		return HomeFragmentPopularRow.createPopularMoviesRow(userViews)
+	}
+
+	fun loadPopularTV(userViews: Collection<BaseItemDto>): HomeFragmentRow {
+		return HomeFragmentPopularRow.createPopularTVRow(userViews)
+	}
+
+	fun loadSimilarToWatched(userViews: Collection<BaseItemDto>): HomeFragmentRow {
+		return HomeFragmentSimilarToWatchedRow.create(userViews)
+	}
+
+	fun loadGenreRandomMovies(userViews: Collection<BaseItemDto>): HomeFragmentRow {
+		return HomeFragmentGenreRow.createMovieGenreRow(userViews)
+	}
+
+	fun loadGenreRandomTV(userViews: Collection<BaseItemDto>): HomeFragmentRow {
+		return HomeFragmentGenreRow.createTVGenreRow(userViews)
+	}
+
+	fun loadGenreRandomMixed(userViews: Collection<BaseItemDto>): HomeFragmentRow {
+		return HomeFragmentGenreRow.createMixedGenreRow(userViews)
 	}
 
 	companion object {

@@ -42,13 +42,13 @@ class SearchFragmentDelegate(
 
 	val onItemViewClickedListener = OnItemViewClickedListener { _, item, _, row ->
 		if (item !is BaseRowItem) return@OnItemViewClickedListener
-		row as ListRow
-		val adapter = row.adapter as ItemRowAdapter
-		itemLauncher.launch(item as BaseRowItem?, adapter, context)
+		if (row !is ListRow) return@OnItemViewClickedListener
+		val adapter = row.adapter as? ItemRowAdapter ?: return@OnItemViewClickedListener
+		itemLauncher.launch(item, adapter, context)
 	}
 
 	val onItemViewSelectedListener = OnItemViewSelectedListener { _, item, _, _ ->
-		val baseItem = item?.let { (item as BaseRowItem).baseItem }
+		val baseItem = (item as? BaseRowItem)?.baseItem
 		if (baseItem != null) {
 			backgroundService.setBackground(baseItem)
 		} else {
