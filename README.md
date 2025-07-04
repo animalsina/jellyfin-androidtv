@@ -12,11 +12,11 @@ This fork focuses on giving Jellyfin Android TV a modern streaming service look 
 I'm redesigning the home screen to match the visual language of modern streaming services - clean layouts, elegant typography, and smooth interactions that feel natural on TV.
 
 ### Key Features Added
-- **Glassmorphic design elements** for a premium, layered look
-- **Smooth navigation pills** with hover animations
-- **Enhanced content cards** with quality badges and better imagery
-- **Improved content discovery** with Continue Watching, Next Up, and genre-based sections
-- **Better visual hierarchy** to help users find what they want quickly
+- **Redesigned top navigation** - Media libraries moved to a clean, accessible navigation bar with complete visual overhaul
+- **Vertical content cards** - Switched from horizontal to vertical card layout for better content display and modern streaming service feel
+- **Streaming service-style previews** - Hover over content to see large preview in the top half of the screen with details and backdrop
+- **Enhanced content discovery** - More content rows on the home page including recommendations, genres, and other discovery sections for easy browsing
+- **Glassmorphic design elements** for a premium, layered look throughout the interface
 
 ### Why These Changes?
 The streaming landscape has evolved a lot in recent years. Users expect certain patterns and interactions from their TV interfaces. This project brings those modern conventions to Jellyfin while keeping all the functionality you love.
@@ -25,9 +25,10 @@ The streaming landscape has evolved a lot in recent years. Users expect certain 
 
 ### Completed
 - **Home page redesign** - Complete overhaul with modern streaming service aesthetics
-- **Navigation system** - New pill-based navigation with smooth animations  
-- **Content organization** - Continue Watching, Next Up, Recommended, and Genre sections
-- **Visual polish** - Glassmorphic backgrounds, quality indicators, enhanced cards
+- **Top navigation overhaul** - Media libraries repositioned for cleaner, more accessible layout
+- **Vertical card redesign** - Switched to vertical content cards for better display and modern feel
+- **Interactive previews** - Hover previews with large content display, details, and backdrop integration
+- **Expanded content discovery** - Multiple content rows including recommendations, genres, and discovery sections
 - **Remote control optimization** - Better focus handling and navigation flow
 
 ### Coming Next
