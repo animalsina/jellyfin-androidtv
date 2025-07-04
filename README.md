@@ -2,7 +2,7 @@
 
 ## A Fresh Take on Home Entertainment
 
-This fork focuses on giving Jellyfin Android TV a modern streaming service look and feel. The goal is to create a more polished, contemporary interface that feels familiar and intuitive for today's users.
+This fork focuses on giving Jellyfin Android TV a modern streaming service look and feel. The goal is to create a more polished, contemporary interface that feels familiar and makes you want to scroll through your collection.
 
 ![Demo of the new interface](Jellyfin_Home_UI_Demo.gif)
 
@@ -23,20 +23,19 @@ The streaming landscape has evolved a lot in recent years. Users expect certain 
 
 ## Current Progress
 
-### ✅ Completed
+### Completed
 - **Home page redesign** - Complete overhaul with modern streaming service aesthetics
 - **Navigation system** - New pill-based navigation with smooth animations  
 - **Content organization** - Continue Watching, Next Up, Recommended, and Genre sections
 - **Visual polish** - Glassmorphic backgrounds, quality indicators, enhanced cards
 - **Remote control optimization** - Better focus handling and navigation flow
 
-### 🚧 Coming Next
+### Coming Next
 This is just the beginning! The home page was the starting point, but I'm planning to extend this design language throughout the app:
 - Settings and preferences screens
-- Search interface
 - Player controls
-- Library browsing views
-- User profile management
+- Media browsing views
+- Content selection within media
 
 ## Installation
 
