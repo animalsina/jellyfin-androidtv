@@ -23,20 +23,18 @@ The streaming landscape has evolved a lot in recent years. Users expect certain 
 
 ## Current Progress
 
-### ✅ Completed
+### Completed
 - **Home page redesign** - Complete overhaul with modern streaming service aesthetics
 - **Navigation system** - New pill-based navigation with smooth animations  
 - **Content organization** - Continue Watching, Next Up, Recommended, and Genre sections
 - **Visual polish** - Glassmorphic backgrounds, quality indicators, enhanced cards
 - **Remote control optimization** - Better focus handling and navigation flow
 
-### 🚧 Coming Next
+### Coming Next
 This is just the beginning! The home page was the starting point, but I'm planning to extend this design language throughout the app:
 - Settings and preferences screens
-- Search interface
 - Player controls
-- Library browsing views
-- User profile management
+- Media browsing views
 
 ## Installation
 
