@@ -1,89 +1,83 @@
-<h1 align="center">Jellyfin Android TV</h1>
-<h3 align="center">Part of the <a href="https://jellyfin.org">Jellyfin Project</a></h3>
+# Jellyfin Android TV - Modern UI Overhaul
+
+## A Fresh Take on Home Entertainment
+
+This fork focuses on giving Jellyfin Android TV a modern streaming service look and feel. The goal is to create a more polished, contemporary interface that feels familiar and intuitive for today's users.
+
+![Demo of the new interface](Jellyfin_Home_UI_Demo.gif)
+
+## What I'm Building
+
+### Modern Home Interface
+I'm redesigning the home screen to match the visual language of modern streaming services - clean layouts, elegant typography, and smooth interactions that feel natural on TV.
+
+### Key Features Added
+- **Glassmorphic design elements** for a premium, layered look
+- **Smooth navigation pills** with hover animations
+- **Enhanced content cards** with quality badges and better imagery
+- **Improved content discovery** with Continue Watching, Next Up, and genre-based sections
+- **Better visual hierarchy** to help users find what they want quickly
+
+### Why These Changes?
+The streaming landscape has evolved a lot in recent years. Users expect certain patterns and interactions from their TV interfaces. This project brings those modern conventions to Jellyfin while keeping all the functionality you love.
+
+## Current Progress
+
+### ✅ Completed
+- **Home page redesign** - Complete overhaul with modern streaming service aesthetics
+- **Navigation system** - New pill-based navigation with smooth animations  
+- **Content organization** - Continue Watching, Next Up, Recommended, and Genre sections
+- **Visual polish** - Glassmorphic backgrounds, quality indicators, enhanced cards
+- **Remote control optimization** - Better focus handling and navigation flow
+
+### 🚧 Coming Next
+This is just the beginning! The home page was the starting point, but I'm planning to extend this design language throughout the app:
+- Settings and preferences screens
+- Search interface
+- Player controls
+- Library browsing views
+- User profile management
+
+## Installation
+
+### Building from Source
+```bash
+git clone https://github.com/ShivPatel123/jellyfin-androidtv.git
+cd jellyfin-androidtv
+./gradlew assembleDebug
+./gradlew installDebug
+```
+
+### Requirements
+- Android TV device or emulator
+- Jellyfin server (10.8.0+ recommended)
+
+## The Vision
+
+The idea is to create an interface that feels as polished and intuitive as commercial streaming services, while maintaining all the power and flexibility that makes Jellyfin great. Every design decision is made with TV viewing in mind - proper spacing for 10-foot interfaces, clear focus indicators, and smooth remote control navigation.
+
+## Development Approach
+
+I'm taking this one section at a time, starting with the home page since that's what users see first. Each update maintains backward compatibility while gradually introducing the new design language.
+
+The technical implementation uses modern Android TV development practices with proper Material Design principles adapted for television interfaces.
+
+## Contributing
+
+If you're interested in helping with the design overhaul, I'd love to collaborate! Areas where contributions would be especially valuable:
+- UI/UX feedback and suggestions
+- Testing on different Android TV devices
+- Performance optimization
+- Additional streaming service-inspired features
+
+## Acknowledgments
+
+This project builds upon the excellent foundation provided by the Jellyfin team and community. Special thanks to all contributors who make open-source media streaming possible.
+
+## Feedback Welcome
+
+This is an ongoing project, and I'm always interested in hearing how the new interface works for different users and setups. Feel free to open issues with suggestions, bug reports, or just general feedback.
 
 ---
 
-<p align="center">
-<img alt="Logo banner" src="https://raw.githubusercontent.com/jellyfin/jellyfin-ux/master/branding/SVG/banner-logo-solid.svg?sanitize=true"/>
-<br/><br/>
-<a href="https://github.com/jellyfin/jellyfin-androidtv">
-<img alt="GPL 2.0 License" src="https://img.shields.io/github/license/jellyfin/jellyfin-androidtv.svg"/>
-</a>
-<a href="https://github.com/jellyfin/jellyfin-androidtv/releases">
-<img alt="Current Release" src="https://img.shields.io/github/release/jellyfin/jellyfin-androidtv.svg"/>
-</a>
-<a href="https://translate.jellyfin.org/projects/jellyfin-android/jellyfin-androidtv/">
-<img alt="Translation Status" src="https://translate.jellyfin.org/widgets/jellyfin-android/-/jellyfin-androidtv/svg-badge.svg"/>
-</a>
-<br/>
-<a href="https://opencollective.com/jellyfin">
-<img alt="Donate" src="https://img.shields.io/opencollective/all/jellyfin.svg?label=backers"/>
-</a>
-<a href="https://features.jellyfin.org">
-<img alt="Feature Requests" src="https://img.shields.io/badge/fider-vote%20on%20features-success.svg"/>
-</a>
-<a href="https://matrix.to/#/+jellyfin:matrix.org">
-<img alt="Chat on Matrix" src="https://img.shields.io/matrix/jellyfin:matrix.org.svg?logo=matrix"/>
-</a>
-<a href="https://www.reddit.com/r/jellyfin">
-<img alt="Join our Subreddit" src="https://img.shields.io/badge/reddit-r%2Fjellyfin-%23FF5700.svg"/>
-</a>
-<br/>
-<a href="https://play.google.com/store/apps/details?id=org.jellyfin.androidtv">
-<img width="153" alt="Jellyfin on Google Play" src="https://jellyfin.org/images/store-icons/google-play.png"/>
-</a>
-<a href="https://www.amazon.com/gp/aw/d/B07TX7Z725">
-<img width="153" alt="Jellyfin on Amazon Appstore" src="https://jellyfin.org/images/store-icons/amazon.png"/>
-</a>
-<a href="https://f-droid.org/en/packages/org.jellyfin.androidtv/">
-<img width="153" alt="Jellyfin on F-Droid" src="https://jellyfin.org/images/store-icons/fdroid.png"/>
-</a>
-<br/>
-<a href="https://repo.jellyfin.org/releases/client/androidtv/">Download archive</a>
-</p>
-
-Jellyfin Android TV is a Jellyfin client for Android TV, Nvidia Shield, and Amazon Fire TV devices.
-We welcome all contributions and pull requests! If you have a larger feature in mind please open an
-issue so we can discuss the implementation before you start. 
-
-## Translating
-
-Translations can be improved very easily from our
-[Weblate](https://translate.jellyfin.org/projects/jellyfin-android/jellyfin-androidtv) instance.
-Look through the following graphic to see if your native language could use some work!
-
-<a href="https://translate.jellyfin.org/engage/jellyfin-android/">
-<img alt="Detailed Translation Status" src="https://translate.jellyfin.org/widgets/jellyfin-android/-/jellyfin-androidtv/multi-auto.svg"/>
-</a>
-
-## Build Process
-
-### Dependencies
-
-- Android Studio
-
-### Build
-
-1. Clone or download this repository
-
-   ```sh
-   git clone https://github.com/jellyfin/jellyfin-androidtv.git
-   cd jellyfin-androidtv
-   ```
-
-2. Open the project in Android Studio and run it from there or build an APK directly through Gradle:
-
-   ```sh
-   ./gradlew assembleDebug
-   ```
-   
-   Add the Android SDK to your PATH environment variable or create the ANDROID_SDK_ROOT variable for
-   this to work.
-
-### Deploy to device/emulator
-
-   ```sh
-   ./gradlew installDebug
-   ```
-
-*You can also replace the "Debug" with "Release" to get an optimized release binary.*
+**Goal: Bring Jellyfin Android TV's interface up to modern streaming service standards while keeping everything that makes it powerful and flexible.**
