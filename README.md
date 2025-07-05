@@ -48,6 +48,14 @@ cd jellyfin-androidtv
 ./gradlew installDebug
 ```
 
+### Pre-built APK
+The latest APK is available in the [Releases](https://github.com/ShivPatel123/jellyfin-androidtv/releases) section. To install:
+
+1. **Download the APK** - Get the latest release from the releases page
+2. **Transfer to TV** - Use LocalSend, USB drive, or cloud storage to get the APK onto your TV
+3. **Enable Unknown Sources** - Go to Settings → Security & Restrictions → Unknown Sources
+4. **Install via File Manager** - Use a file browser app to navigate to and install the APK
+
 ### Requirements
 - Android TV device or emulator
 - Jellyfin server (10.8.0+ recommended)
