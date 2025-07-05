@@ -1,0 +1,21 @@
+{
+  "version": 3,
+  "artifactType": {
+    "type": "APK",
+    "kind": "Directory"
+  },
+  "applicationId": "org.jellyfin.androidtv.debug",
+  "variantName": "debug",
+  "elements": [
+    {
+      "type": "SINGLE",
+      "filters": [],
+      "attributes": [],
+      "versionCode": 1,
+      "versionName": "0.0.0-dev.1",
+      "outputFile": "jellyfin-androidtv-v0.0.0-dev.1-debug.apk"
+    }
+  ],
+  "elementType": "File",
+  "minSdkVersionForDexing": 21
+}
