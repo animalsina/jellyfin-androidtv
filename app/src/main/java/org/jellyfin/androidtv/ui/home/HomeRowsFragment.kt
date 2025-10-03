@@ -5,6 +5,7 @@ import android.view.KeyEvent
 import android.view.View
 import androidx.leanback.app.RowsSupportFragment
 import androidx.leanback.widget.ListRow
+import androidx.leanback.widget.ObjectAdapter
 import androidx.leanback.widget.OnItemViewClickedListener
 import androidx.leanback.widget.OnItemViewSelectedListener
 import androidx.leanback.widget.Presenter
@@ -56,6 +57,7 @@ import org.koin.android.ext.android.inject
 import timber.log.Timber
 import kotlin.time.Duration.Companion.seconds
 
+@Suppress("UNCHECKED_CAST")
 class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyListener {
 	private val api by inject<ApiClient>()
 	private val backgroundService by inject<BackgroundService>()

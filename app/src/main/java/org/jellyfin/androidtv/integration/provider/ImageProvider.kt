@@ -7,6 +7,7 @@ import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.os.Build
 import android.os.ParcelFileDescriptor
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.graphics.drawable.toBitmap
 import androidx.core.net.toUri
 import coil3.ImageLoader
@@ -48,7 +49,7 @@ class ImageProvider : ContentProvider() {
 					},
 					onError = { image ->
 						val fallback = image?.asDrawable(context!!.resources)
-							?: context!!.getDrawable(R.drawable.placeholder_icon)!!
+							?: AppCompatResources.getDrawable(context!!, R.drawable.placeholder_icon)!!
 						writeDrawable(fallback, outputStream)
 					}
 				)
