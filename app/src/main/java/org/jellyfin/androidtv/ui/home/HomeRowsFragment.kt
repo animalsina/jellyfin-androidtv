@@ -5,7 +5,6 @@ import android.view.KeyEvent
 import android.view.View
 import androidx.leanback.app.RowsSupportFragment
 import androidx.leanback.widget.ListRow
-import androidx.leanback.widget.ObjectAdapter
 import androidx.leanback.widget.OnItemViewClickedListener
 import androidx.leanback.widget.OnItemViewSelectedListener
 import androidx.leanback.widget.Presenter
