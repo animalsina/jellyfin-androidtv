@@ -87,27 +87,27 @@ class HomeFragmentHelper(
 
 	// New row loader methods for Netflix-style rows
 	fun loadRecommendedForYou(userViews: Collection<BaseItemDto>): HomeFragmentRow {
-		return HomeFragmentRecommendedRow.createRecommendedForYouRow(userViews)
+		return HomeFragmentRecommendedRow.createRecommendedForYouRow(context, userViews)
 	}
 
 	fun loadTrendingThisWeek(userViews: Collection<BaseItemDto>): HomeFragmentRow {
-		return HomeFragmentPopularRow.createTrendingRow(userViews)
+		return HomeFragmentPopularRow.createTrendingRow(context, userViews)
 	}
 
 	fun loadRecentlyReleased(userViews: Collection<BaseItemDto>): HomeFragmentRow {
-		return HomeFragmentPopularRow.createRecentlyReleasedRow(userViews)
+		return HomeFragmentPopularRow.createRecentlyReleasedRow(context, userViews)
 	}
 
 	fun loadPopularMovies(userViews: Collection<BaseItemDto>): HomeFragmentRow {
-		return HomeFragmentPopularRow.createPopularMoviesRow(userViews)
+		return HomeFragmentPopularRow.createPopularMoviesRow(context, userViews)
 	}
 
 	fun loadPopularTV(userViews: Collection<BaseItemDto>): HomeFragmentRow {
-		return HomeFragmentPopularRow.createPopularTVRow(userViews)
+		return HomeFragmentPopularRow.createPopularTVRow(context, userViews)
 	}
 
 	fun loadSimilarToWatched(userViews: Collection<BaseItemDto>): HomeFragmentRow {
-		return HomeFragmentSimilarToWatchedRow.create(userViews)
+		return HomeFragmentSimilarToWatchedRow.create(context, userViews)
 	}
 
 	fun loadGenreRandomMovies(userViews: Collection<BaseItemDto>): HomeFragmentRow {
@@ -124,9 +124,9 @@ class HomeFragmentHelper(
 
 	companion object {
 		// Maximum amount of items loaded for a row
-		private const val ITEM_LIMIT_RESUME = 50
-		private const val ITEM_LIMIT_RECORDINGS = 40
-		private const val ITEM_LIMIT_NEXT_UP = 50
-		private const val ITEM_LIMIT_ON_NOW = 20
+		private const val ITEM_LIMIT_RESUME = 15
+		private const val ITEM_LIMIT_RECORDINGS = 15
+		private const val ITEM_LIMIT_NEXT_UP = 15
+		private const val ITEM_LIMIT_ON_NOW = 15
 	}
 }

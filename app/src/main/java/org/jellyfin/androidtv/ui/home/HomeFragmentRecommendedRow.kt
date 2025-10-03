@@ -2,7 +2,7 @@ package org.jellyfin.androidtv.ui.home
 
 import android.content.Context
 import androidx.leanback.widget.Row
-import org.jellyfin.androidtv.constant.ChangeTriggerType
+import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.data.repository.ItemRepository
 import org.jellyfin.androidtv.ui.browsing.BrowseRowDef
 import org.jellyfin.androidtv.ui.presentation.CardPresenter
@@ -14,7 +14,6 @@ import org.jellyfin.sdk.model.api.ItemFields
 import org.jellyfin.sdk.model.api.ItemSortBy
 import org.jellyfin.sdk.model.api.SortOrder
 import org.jellyfin.sdk.model.api.request.GetItemsRequest
-import org.jellyfin.sdk.model.api.request.GetSimilarItemsRequest
 
 class HomeFragmentRecommendedRow(
 	private val userViews: Collection<BaseItemDto>,
@@ -44,7 +43,7 @@ class HomeFragmentRecommendedRow(
 		// 3. Find similar items based on genres/people from that item
 		// 4. For now, we'll use a simpler approach that finds unplayed content
 		//    similar to popular/well-rated content
-		
+
 		return GetItemsRequest(
 			fields = ItemRepository.itemFields + ItemFields.GENRES + ItemFields.PEOPLE,
 			includeItemTypes = listOf(BaseItemKind.MOVIE, BaseItemKind.SERIES),
@@ -88,7 +87,7 @@ class HomeFragmentRecommendedRow(
 		val relevantViews = userViews.filter { view ->
 			view.collectionType in arrayOf(CollectionType.MOVIES, CollectionType.TVSHOWS)
 		}
-		
+
 		// If we have multiple relevant views, return null to search all
 		// If we have one specific view, use its ID
 		return if (relevantViews.size == 1) relevantViews.first().id?.toString() else null
@@ -104,9 +103,9 @@ class HomeFragmentRecommendedRow(
 		private const val ITEM_LIMIT = 50
 
 		// Factory methods for specific recommendation row types
-		fun createRecommendedForYouRow(userViews: Collection<BaseItemDto>) = HomeFragmentRecommendedRow(
+		fun createRecommendedForYouRow(context: Context, userViews: Collection<BaseItemDto>) = HomeFragmentRecommendedRow(
 			userViews = userViews,
-			title = "Recommended for You",
+			title = context.getString(R.string.home_section_recommended_for_you),
 			recommendationStrategy = RecommendationStrategy.RECOMMENDED_FOR_YOU
 		)
 

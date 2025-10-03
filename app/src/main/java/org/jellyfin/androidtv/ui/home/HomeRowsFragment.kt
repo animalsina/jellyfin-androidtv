@@ -88,7 +88,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 		super.onCreate(savedInstanceState)
 
 		adapter = MutableObjectAdapter<Row>(PositionableListRowPresenter(0))
-		
+
 		// Build initial rows
 		buildHomeRows()
 
@@ -190,7 +190,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 			withContext(Dispatchers.Main) {
 				// Clear existing rows
 				(adapter as MutableObjectAdapter<Row>).clear()
-				
+
 				// Use uniform card size (120px) across all rows
 				val cardPresenter = CardPresenter(true, org.jellyfin.androidtv.constant.ImageType.POSTER, 120)
 
@@ -286,20 +286,20 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 				// Check if we have a row with items and auto-select the first item if available
 				val listRow = row as? ListRow
 				val itemRowAdapter = listRow?.adapter as? ItemRowAdapter
-				
+
 				if (itemRowAdapter != null && itemRowAdapter.size() > 0) {
 					// Auto-select first item in the row to maintain preview
 					val firstItem = itemRowAdapter[0] as? BaseRowItem
 					if (firstItem != null) {
 						currentItem = firstItem
 						currentRow = listRow
-						
+
 						backgroundService.setBackground(firstItem.baseItem)
 						homePreviewViewModel.updateSelectedItem(firstItem)
 						return
 					}
 				}
-				
+
 				// Fallback: clear everything if no items available
 				currentItem = null
 				backgroundService.clearBackgrounds()

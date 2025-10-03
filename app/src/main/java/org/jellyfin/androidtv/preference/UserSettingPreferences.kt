@@ -15,16 +15,16 @@ class UserSettingPreferences(
 	api = api,
 	app = "emby",
 ) {
-	
+
 	init {
 		// Update displayPreferencesId when user changes
 		updateDisplayPreferencesId()
 	}
-	
+
 	private fun updateDisplayPreferencesId() {
 		displayPreferencesId = "usersettings-${userRepository.currentUser.value?.id?.toString() ?: "default"}"
 	}
-	
+
 	fun onUserChanged() {
 		updateDisplayPreferencesId()
 		clearCache() // Clear cache to force reload for new user
@@ -37,12 +37,12 @@ class UserSettingPreferences(
 		val homesection1 = enumPreference("homesection1", HomeSectionType.NEXT_UP)
 		val homesection2 = enumPreference("homesection2", HomeSectionType.RECOMMENDED_FOR_YOU)
 		val homesection3 = enumPreference("homesection3", HomeSectionType.RECENTLY_RELEASED)
-		val homesection4 = enumPreference("homesection4", HomeSectionType.POPULAR_MOVIES)
-		val homesection5 = enumPreference("homesection5", HomeSectionType.GENRE_RANDOM_TV)
-		val homesection6 = enumPreference("homesection6", HomeSectionType.POPULAR_TV)
-		val homesection7 = enumPreference("homesection7", HomeSectionType.GENRE_RANDOM_MOVIES)
-		val homesection8 = enumPreference("homesection8", HomeSectionType.TRENDING_THIS_WEEK)
-		val homesection9 = enumPreference("homesection9", HomeSectionType.GENRE_RANDOM_MIXED)
+		val homesection4 = enumPreference("homesection4", HomeSectionType.NONE)
+		val homesection5 = enumPreference("homesection5", HomeSectionType.NONE)
+		val homesection6 = enumPreference("homesection6", HomeSectionType.NONE)
+		val homesection7 = enumPreference("homesection7", HomeSectionType.NONE)
+		val homesection8 = enumPreference("homesection8", HomeSectionType.NONE)
+		val homesection9 = enumPreference("homesection9", HomeSectionType.NONE)
 	}
 
 	val homesections = listOf(

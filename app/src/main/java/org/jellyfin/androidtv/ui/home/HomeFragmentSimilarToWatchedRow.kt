@@ -2,24 +2,19 @@ package org.jellyfin.androidtv.ui.home
 
 import android.content.Context
 import androidx.leanback.widget.Row
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import org.jellyfin.androidtv.constant.ChangeTriggerType
+import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.data.repository.ItemRepository
 import org.jellyfin.androidtv.ui.browsing.BrowseRowDef
 import org.jellyfin.androidtv.ui.presentation.CardPresenter
 import org.jellyfin.androidtv.ui.presentation.MutableObjectAdapter
 import org.jellyfin.sdk.api.client.ApiClient
-import org.jellyfin.sdk.api.client.extensions.userLibraryApi
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.CollectionType
 import org.jellyfin.sdk.model.api.ItemFields
 import org.jellyfin.sdk.model.api.ItemSortBy
-import org.jellyfin.sdk.model.api.MediaType
 import org.jellyfin.sdk.model.api.SortOrder
 import org.jellyfin.sdk.model.api.request.GetItemsRequest
-import org.jellyfin.sdk.model.api.request.GetResumeItemsRequest
 import org.koin.java.KoinJavaComponent.inject
 
 class HomeFragmentSimilarToWatchedRow(
@@ -32,7 +27,7 @@ class HomeFragmentSimilarToWatchedRow(
 	override fun addToRowsAdapter(context: Context, cardPresenter: CardPresenter, rowsAdapter: MutableObjectAdapter<Row>) {
 		// Create a more sophisticated "similar to watched" request
 		val request = createSimilarToWatchedRequest()
-		
+
 		// Create and add the row with static height for consistent sizing
 		val row = HomeFragmentBrowseRowDefRow(
 			BrowseRowDef(title, request, 50, false, true)
@@ -67,7 +62,7 @@ class HomeFragmentSimilarToWatchedRow(
 		val relevantViews = userViews.filter { view ->
 			view.collectionType in arrayOf(CollectionType.MOVIES, CollectionType.TVSHOWS)
 		}
-		
+
 		// If we have multiple relevant views, return null to search all
 		// If we have one specific view, use its ID
 		return if (relevantViews.size == 1) relevantViews.first().id?.toString() else null
@@ -77,9 +72,9 @@ class HomeFragmentSimilarToWatchedRow(
 		private const val ITEM_LIMIT = 50
 
 		// Factory method
-		fun create(userViews: Collection<BaseItemDto>) = HomeFragmentSimilarToWatchedRow(
+		fun create(context: Context, userViews: Collection<BaseItemDto>) = HomeFragmentSimilarToWatchedRow(
 			userViews = userViews,
-			title = "More Like This"
+			title = context.getString(R.string.home_section_similar_to_watched)
 		)
 	}
 }

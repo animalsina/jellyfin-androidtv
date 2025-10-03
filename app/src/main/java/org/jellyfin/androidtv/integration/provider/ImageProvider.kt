@@ -11,6 +11,7 @@ import androidx.core.graphics.drawable.toBitmap
 import androidx.core.net.toUri
 import coil3.ImageLoader
 import coil3.asDrawable
+import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import coil3.request.error
 import org.jellyfin.androidtv.BuildConfig
@@ -35,14 +36,24 @@ class ImageProvider : ContentProvider() {
 		val (read, write) = ParcelFileDescriptor.createPipe()
 		val outputStream = ParcelFileDescriptor.AutoCloseOutputStream(write)
 
-		imageLoader.enqueue(ImageRequest.Builder(context!!).apply {
-			data(src)
-			error(R.drawable.placeholder_icon)
-			target(
-				onSuccess = { image -> writeDrawable(image.asDrawable(context!!.resources), outputStream) },
-				onError = { image -> writeDrawable(requireNotNull(image?.asDrawable(context!!.resources)), outputStream) }
-			)
-		}.build())
+		imageLoader.enqueue(
+			ImageRequest.Builder(context!!)
+				.data(src)
+				.diskCachePolicy(CachePolicy.ENABLED)   // cache persistente su disco
+				.memoryCachePolicy(CachePolicy.ENABLED) // cache in RAM
+				.error(R.drawable.placeholder_icon)
+				.target(
+					onSuccess = { image ->
+						writeDrawable(image.asDrawable(context!!.resources), outputStream)
+					},
+					onError = { image ->
+						val fallback = image?.asDrawable(context!!.resources)
+							?: context!!.getDrawable(R.drawable.placeholder_icon)!!
+						writeDrawable(fallback, outputStream)
+					}
+				)
+				.build()
+		)
 
 		return read
 	}
@@ -59,10 +70,10 @@ class ImageProvider : ContentProvider() {
 
 		try {
 			outputStream.use {
-				drawable.toBitmap().compress(format, COMPRESSION_QUALITY, outputStream)
+				drawable.toBitmap().compress(format, COMPRESSION_QUALITY, it)
 			}
 		} catch (_: IOException) {
-			// Ignore IOException as this is commonly thrown when the load request is cancelled
+			// Ignora: capita quando la richiesta viene annullata
 		}
 	}
 
@@ -70,8 +81,8 @@ class ImageProvider : ContentProvider() {
 		private const val COMPRESSION_QUALITY = 95
 
 		/**
-		 * Get a [Uri] that uses the [ImageProvider] to load an image. The input should be a valid
-		 * Jellyfin image URL created using the SDK.
+		 * Restituisce un [Uri] che usa l'[ImageProvider] per caricare un’immagine.
+		 * L’input deve essere una URL Jellyfin valida.
 		 */
 		fun getImageUri(src: String): Uri = Uri.Builder()
 			.scheme("content")

@@ -32,7 +32,6 @@ import org.jellyfin.androidtv.ui.navigation.NavigationRepository
 import org.jellyfin.androidtv.ui.playback.MediaManager
 import org.jellyfin.androidtv.ui.startup.StartupActivity
 import org.jellyfin.androidtv.util.ImageHelper
-import org.jellyfin.androidtv.util.apiclient.JellyfinImage
 import org.jellyfin.androidtv.util.apiclient.itemImages
 import org.jellyfin.androidtv.util.apiclient.itemBackdropImages
 import org.jellyfin.androidtv.util.apiclient.parentBackdropImages
@@ -133,8 +132,8 @@ class HomeFragmentNetflixStyle : Fragment() {
             previewAgeRating.visibility = View.GONE
             return
         }
-        
-        val baseItem = item.baseItem!!
+
+        val baseItem = item.baseItem
 
         // Update background image
         val backdropImage = when {
@@ -144,17 +143,17 @@ class HomeFragmentNetflixStyle : Fragment() {
             // For episodes, try parent backdrops
             baseItem.parentBackdropImages.isNotEmpty() -> baseItem.parentBackdropImages.firstOrNull()
             // For episodes, use primary image (screenshot) as fallback
-            baseItem.type == BaseItemKind.EPISODE && baseItem.itemImages[ImageType.PRIMARY] != null -> 
+            baseItem.type == BaseItemKind.EPISODE && baseItem.itemImages[ImageType.PRIMARY] != null ->
                 baseItem.itemImages[ImageType.PRIMARY]
             // Last resort: try series thumb
-            baseItem.type == BaseItemKind.EPISODE && baseItem.seriesThumbImage != null -> 
+            baseItem.type == BaseItemKind.EPISODE && baseItem.seriesThumbImage != null ->
                 baseItem.seriesThumbImage
             else -> null
         }
-        
+
         if (backdropImage != null) {
             val backdropUrl = imageHelper.getImageUrl(backdropImage)
-            
+
             // Load image with a callback to show views only after loading
             previewBackground.doOnAttach {
                 it.findViewTreeLifecycleOwner()?.lifecycleScope?.launch {
@@ -189,15 +188,15 @@ class HomeFragmentNetflixStyle : Fragment() {
         // Content type
         when (item.type) {
             BaseItemKind.MOVIE -> {
-                previewContentType.text = "FILM"
+                previewContentType.text = requireContext().getString(R.string.lbl_movie)
                 previewContentType.visibility = View.VISIBLE
             }
             BaseItemKind.SERIES -> {
-                previewContentType.text = "SERIES"
+                previewContentType.text = requireContext().getString(R.string.lbl_series)
                 previewContentType.visibility = View.VISIBLE
             }
             BaseItemKind.EPISODE -> {
-                previewContentType.text = "EPISODE"
+                previewContentType.text = requireContext().getString(R.string.lbl_episode)
                 previewContentType.visibility = View.VISIBLE
             }
             else -> previewContentType.visibility = View.GONE
@@ -238,13 +237,13 @@ class HomeFragmentNetflixStyle : Fragment() {
         activity?.startActivity(selectUserIntent)
         activity?.finishAfterTransition()
     }
-    
+
     private fun navigateToLibraryType(collectionType: CollectionType) {
         lifecycleScope.launch {
             try {
                 val userViews = userViewsRepository.views.first()
                 val libraryView = userViews.find { it.collectionType == collectionType }
-                
+
                 if (libraryView != null) {
                     val destination = itemLauncher.getUserViewDestination(libraryView)
                     navigationRepository.navigate(destination)
@@ -261,25 +260,25 @@ class HomeFragmentNetflixStyle : Fragment() {
             }
         }
     }
-    
+
     private fun setupGlassmorphicToolbar(view: View) {
         // Search button
         view.findViewById<View>(R.id.toolbar_search)?.setOnClickListener {
             navigationRepository.navigate(Destinations.search())
         }
-        
+
         // Set up dynamic navigation tabs
         setupDynamicNavigationTabs(view)
-        
+
         // User avatar container
         val userAvatarContainer = view.findViewById<View>(R.id.toolbar_user_avatar_container)
         userAvatarContainer?.setOnClickListener {
             switchUser()
         }
-        
+
         // Get the actual user avatar for loading image
         val userAvatar = view.findViewById<AsyncImageView>(R.id.toolbar_user_avatar)
-        
+
         // Load user avatar image
         lifecycleScope.launch {
             userRepository.currentUser.filterNotNull().collect { user ->
@@ -290,25 +289,25 @@ class HomeFragmentNetflixStyle : Fragment() {
             }
         }
     }
-    
+
     private fun setupDynamicNavigationTabs(view: View) {
         lifecycleScope.launch {
             try {
                 val userViews = userViewsRepository.views.first()
                 val navContainer = view.findViewById<ViewGroup>(R.id.nav_pills_container)
-                
+
                 // Clear existing dynamic tabs (keep only static ones)
                 navContainer?.removeAllViews()
-                
+
                 // Create tabs based on available libraries
                 var previousButtonId: Int? = null
                 var firstLibraryButtonId: Int? = null
-                
+
                 for (userView in userViews) {
                     val tabButton = createNavTab(userView)
                     if (tabButton != null) {
                         navContainer?.addView(tabButton)
-                        
+
                         // Set up focus navigation
                         if (previousButtonId != null) {
                             tabButton.nextFocusLeftId = previousButtonId
@@ -318,15 +317,15 @@ class HomeFragmentNetflixStyle : Fragment() {
                             // Connect search button to first library tab
                             view.findViewById<View>(R.id.toolbar_search)?.nextFocusRightId = tabButton.id
                         }
-                        
+
                         previousButtonId = tabButton.id
                     }
                 }
-                
+
                 // Add Jellyfin tab (always present)
                 val jellyfinTab = createJellyfinTab()
                 navContainer?.addView(jellyfinTab)
-                
+
                 // Set up focus navigation for Jellyfin tab
                 if (previousButtonId != null) {
                     jellyfinTab.nextFocusLeftId = previousButtonId
@@ -335,11 +334,11 @@ class HomeFragmentNetflixStyle : Fragment() {
                     // If no libraries, connect search directly to Jellyfin
                     view.findViewById<View>(R.id.toolbar_search)?.nextFocusRightId = jellyfinTab.id
                 }
-                
+
                 // Connect last tab to user avatar
                 jellyfinTab.nextFocusRightId = R.id.toolbar_user_avatar
                 view.findViewById<View>(R.id.toolbar_user_avatar)?.nextFocusLeftId = jellyfinTab.id
-                
+
             } catch (e: Exception) {
                 timber.log.Timber.e(e, "Failed to set up dynamic navigation tabs")
                 // Fallback to static tabs if dynamic setup fails
@@ -347,11 +346,11 @@ class HomeFragmentNetflixStyle : Fragment() {
             }
         }
     }
-    
+
     private fun createNavTab(userView: BaseItemDto): TextView? {
-        val displayName = getDisplayNameForCollectionType(userView.collectionType, userView.name)
+        val displayName = getDisplayNameForCollectionType( userView.collectionType, userView.name)
         if (displayName == null) return null
-        
+
         return TextView(requireContext()).apply {
             id = View.generateViewId()
             layoutParams = ViewGroup.MarginLayoutParams(
@@ -378,13 +377,13 @@ class HomeFragmentNetflixStyle : Fragment() {
             )
             isFocusable = true
             isClickable = true
-            
+
             setOnClickListener {
                 navigateToSpecificLibrary(userView)
             }
         }
     }
-    
+
     private fun createJellyfinTab(): TextView {
         return TextView(requireContext()).apply {
             id = View.generateViewId()
@@ -412,26 +411,27 @@ class HomeFragmentNetflixStyle : Fragment() {
             )
             isFocusable = true
             isClickable = true
-            
+
             setOnClickListener {
                 startActivity(ActivityDestinations.userPreferences(requireContext()))
             }
         }
     }
-    
+
     private fun getDisplayNameForCollectionType(collectionType: CollectionType?, fallbackName: String?): String? {
+		val ctx = requireContext()
         return when (collectionType) {
-            CollectionType.MOVIES -> "Movies"
-            CollectionType.TVSHOWS -> "Shows"
-            CollectionType.MUSIC -> "Music"
-            CollectionType.PHOTOS -> "Photos"
-            CollectionType.PLAYLISTS -> "Playlists"
-            CollectionType.LIVETV -> "Live TV"
-            CollectionType.BOXSETS -> "Collections"
+            CollectionType.MOVIES ->  ctx.getString(R.string.lbl_movies)
+            CollectionType.TVSHOWS -> ctx.getString(R.string.lbl_tv_show)
+            CollectionType.MUSIC -> ctx.getString(R.string.lbl_music)
+            CollectionType.PHOTOS -> ctx.getString(R.string.lbl_photo)
+            CollectionType.PLAYLISTS -> ctx.getString(R.string.lbl_playlists)
+            CollectionType.LIVETV -> ctx.getString(R.string.lbl_live)
+            CollectionType.BOXSETS -> ctx.getString(R.string.lbl_collections)
             else -> fallbackName // Use the library's custom name for unknown types
         }
     }
-    
+
     private fun navigateToSpecificLibrary(userView: BaseItemDto) {
         lifecycleScope.launch {
             try {
@@ -444,22 +444,23 @@ class HomeFragmentNetflixStyle : Fragment() {
             }
         }
     }
-    
+
     private fun setupStaticNavigationTabs(view: View) {
         // Fallback implementation: create basic tabs when dynamic setup fails
         val navContainer = view.findViewById<ViewGroup>(R.id.nav_pills_container)
-        
+		val ctx = requireContext()
+
         // Create static tabs as fallback
-        val moviesTab = createStaticTab("Movies") { navigateToLibraryType(CollectionType.MOVIES) }
-        val showsTab = createStaticTab("Shows") { navigateToLibraryType(CollectionType.TVSHOWS) }
-        val playlistsTab = createStaticTab("Playlists") { navigateToLibraryType(CollectionType.PLAYLISTS) }
-        val jellyfinTab = createStaticTab("Jellyfin") { startActivity(ActivityDestinations.userPreferences(requireContext())) }
-        
+        val moviesTab = createStaticTab(ctx.getString(R.string.lbl_movies)) { navigateToLibraryType(CollectionType.MOVIES) }
+        val showsTab = createStaticTab(ctx.getString(R.string.lbl_tv_show)) { navigateToLibraryType(CollectionType.TVSHOWS) }
+        val playlistsTab = createStaticTab(ctx.getString(R.string.lbl_playlists)) { navigateToLibraryType(CollectionType.PLAYLISTS) }
+        val jellyfinTab = createStaticTab(ctx.getString(R.string.lbl_jellyfin)) { startActivity(ActivityDestinations.userPreferences(requireContext())) }
+
         navContainer?.addView(moviesTab)
         navContainer?.addView(showsTab)
         navContainer?.addView(playlistsTab)
         navContainer?.addView(jellyfinTab)
-        
+
         // Set up basic focus navigation
         view.findViewById<View>(R.id.toolbar_search)?.nextFocusRightId = moviesTab.id
         moviesTab.nextFocusLeftId = R.id.toolbar_search
@@ -472,7 +473,7 @@ class HomeFragmentNetflixStyle : Fragment() {
         jellyfinTab.nextFocusRightId = R.id.toolbar_user_avatar
         view.findViewById<View>(R.id.toolbar_user_avatar)?.nextFocusLeftId = jellyfinTab.id
     }
-    
+
     private fun createStaticTab(text: String, onClickListener: () -> Unit): TextView {
         return TextView(requireContext()).apply {
             id = View.generateViewId()
@@ -500,7 +501,7 @@ class HomeFragmentNetflixStyle : Fragment() {
             )
             isFocusable = true
             isClickable = true
-            
+
             setOnClickListener { onClickListener() }
         }
     }

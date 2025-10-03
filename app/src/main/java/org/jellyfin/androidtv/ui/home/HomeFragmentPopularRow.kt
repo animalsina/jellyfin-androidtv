@@ -2,7 +2,7 @@ package org.jellyfin.androidtv.ui.home
 
 import android.content.Context
 import androidx.leanback.widget.Row
-import org.jellyfin.androidtv.constant.ChangeTriggerType
+import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.data.repository.ItemRepository
 import org.jellyfin.androidtv.ui.browsing.BrowseRowDef
 import org.jellyfin.androidtv.ui.presentation.CardPresenter
@@ -14,7 +14,6 @@ import org.jellyfin.sdk.model.api.ItemFields
 import org.jellyfin.sdk.model.api.ItemSortBy
 import org.jellyfin.sdk.model.api.SortOrder
 import org.jellyfin.sdk.model.api.request.GetItemsRequest
-import kotlin.time.Duration.Companion.days
 
 class HomeFragmentPopularRow(
 	private val userViews: Collection<BaseItemDto>,
@@ -89,7 +88,7 @@ class HomeFragmentPopularRow(
 				else -> arrayOf(CollectionType.MOVIES, CollectionType.TVSHOWS)
 			}
 		}
-		
+
 		// If we have multiple relevant views, return null to search all
 		// If we have one specific view, use its ID
 		return if (relevantViews.size == 1) relevantViews.first().id?.toString() else null
@@ -106,31 +105,36 @@ class HomeFragmentPopularRow(
 		private const val ITEM_LIMIT = 50
 
 		// Factory methods for specific popular row types
-		fun createPopularMoviesRow(userViews: Collection<BaseItemDto>) = HomeFragmentPopularRow(
+		fun createPopularMoviesRow(context: Context, userViews: Collection<BaseItemDto>) = HomeFragmentPopularRow(
 			userViews = userViews,
 			includeTypes = arrayOf(BaseItemKind.MOVIE),
-			title = "Popular Movies",
+			title =  context.getString(R.string.popular_tv_shows),
 			popularityStrategy = PopularityStrategy.PLAY_COUNT
 		)
 
-		fun createPopularTVRow(userViews: Collection<BaseItemDto>) = HomeFragmentPopularRow(
+	/**
+	 * Factory method for creating a popular TV shows row.
+	 * @param userViews the user views to filter and sort
+	 * @return a new HomeFragmentPopularRow with the given user views and parameters
+	 */
+		fun createPopularTVRow(context: Context, userViews: Collection<BaseItemDto>) = HomeFragmentPopularRow(
 			userViews = userViews,
 			includeTypes = arrayOf(BaseItemKind.SERIES),
-			title = "Popular TV Shows",
+			title = context.getString(R.string.popular_tv_shows),
 			popularityStrategy = PopularityStrategy.PLAY_COUNT
 		)
 
-		fun createTrendingRow(userViews: Collection<BaseItemDto>) = HomeFragmentPopularRow(
+		fun createTrendingRow(context: Context, userViews: Collection<BaseItemDto>) = HomeFragmentPopularRow(
 			userViews = userViews,
 			includeTypes = arrayOf(BaseItemKind.MOVIE, BaseItemKind.SERIES),
-			title = "Trending This Week",
+			title = context.getString(R.string.trending_this_week),
 			popularityStrategy = PopularityStrategy.TRENDING
 		)
 
-		fun createRecentlyReleasedRow(userViews: Collection<BaseItemDto>) = HomeFragmentPopularRow(
+		fun createRecentlyReleasedRow(context: Context, userViews: Collection<BaseItemDto>) = HomeFragmentPopularRow(
 			userViews = userViews,
 			includeTypes = arrayOf(BaseItemKind.MOVIE, BaseItemKind.SERIES),
-			title = "Recently Released",
+			title = context.getString(R.string.home_section_recently_released),
 			popularityStrategy = PopularityStrategy.RECENTLY_RELEASED
 		)
 	}
