@@ -37,7 +37,6 @@ import org.jellyfin.androidtv.preference.UserSettingPreferences
 import org.jellyfin.androidtv.ui.browsing.CompositeClickedListener
 import org.jellyfin.androidtv.ui.browsing.CompositeSelectedListener
 import org.jellyfin.androidtv.ui.itemhandling.BaseRowItem
-import org.jellyfin.androidtv.ui.itemhandling.BaseItemDtoBaseRowItem
 import org.jellyfin.androidtv.ui.itemhandling.ItemLauncher
 import org.jellyfin.androidtv.ui.itemhandling.ItemRowAdapter
 import org.jellyfin.androidtv.ui.itemhandling.refreshItem
@@ -189,7 +188,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 			// Add sections to layout
 			withContext(Dispatchers.Main) {
 				// Clear existing rows
-				(adapter as MutableObjectAdapter<Row>).clear()
+				(adapter as MutableObjectAdapter<*>).clear()
 
 				// Use uniform card size (120px) across all rows
 				val cardPresenter = CardPresenter(true, org.jellyfin.androidtv.constant.ImageType.POSTER, 120)

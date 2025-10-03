@@ -22,8 +22,6 @@ class HomeFragmentSimilarToWatchedRow(
 	private val title: String = "More Like This"
 ) : HomeFragmentRow {
 
-	private val api: ApiClient by inject(ApiClient::class.java)
-
 	override fun addToRowsAdapter(context: Context, cardPresenter: CardPresenter, rowsAdapter: MutableObjectAdapter<Row>) {
 		// Create a more sophisticated "similar to watched" request
 		val request = createSimilarToWatchedRequest()
@@ -65,7 +63,7 @@ class HomeFragmentSimilarToWatchedRow(
 
 		// If we have multiple relevant views, return null to search all
 		// If we have one specific view, use its ID
-		return if (relevantViews.size == 1) relevantViews.first().id?.toString() else null
+		return if (relevantViews.size == 1) relevantViews.first().id.toString() else null
 	}
 
 	companion object {

@@ -91,7 +91,7 @@ class HomeFragmentPopularRow(
 
 		// If we have multiple relevant views, return null to search all
 		// If we have one specific view, use its ID
-		return if (relevantViews.size == 1) relevantViews.first().id?.toString() else null
+		return if (relevantViews.size == 1) relevantViews.first().id.toString() else null
 	}
 
 	enum class PopularityStrategy {

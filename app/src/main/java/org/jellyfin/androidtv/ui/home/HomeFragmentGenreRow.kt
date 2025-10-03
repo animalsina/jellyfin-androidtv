@@ -3,7 +3,6 @@ package org.jellyfin.androidtv.ui.home
 import android.content.Context
 import androidx.leanback.widget.Row
 import org.jellyfin.androidtv.R
-import org.jellyfin.androidtv.constant.ChangeTriggerType
 import org.jellyfin.androidtv.data.repository.ItemRepository
 import org.jellyfin.androidtv.ui.browsing.BrowseRowDef
 import org.jellyfin.androidtv.ui.presentation.CardPresenter
@@ -15,7 +14,6 @@ import org.jellyfin.sdk.model.api.ItemFields
 import org.jellyfin.sdk.model.api.ItemSortBy
 import org.jellyfin.sdk.model.api.SortOrder
 import org.jellyfin.sdk.model.api.request.GetItemsRequest
-import kotlin.random.Random
 
 class HomeFragmentGenreRow(
 	private val userViews: Collection<BaseItemDto>,
@@ -82,7 +80,7 @@ class HomeFragmentGenreRow(
 
 		// If we have multiple relevant views, return null to search all
 		// If we have one specific view, use its ID
-		return if (relevantViews.size == 1) relevantViews.first().id?.toString() else null
+		return if (relevantViews.size == 1) relevantViews.first().id.toString() else null
 	}
 
 	enum class GenreSelectionStrategy {

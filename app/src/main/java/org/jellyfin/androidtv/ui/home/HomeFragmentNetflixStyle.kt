@@ -6,6 +6,8 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import androidx.core.content.ContextCompat
+import androidx.core.content.res.ResourcesCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentContainerView
 import androidx.lifecycle.Lifecycle
@@ -46,463 +48,466 @@ import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.activityViewModel
 
 class HomeFragmentNetflixStyle : Fragment() {
-    private val sessionRepository by inject<SessionRepository>()
-    private val userRepository by inject<UserRepository>()
-    private val serverRepository by inject<ServerRepository>()
-    private val notificationRepository by inject<NotificationsRepository>()
-    private val navigationRepository by inject<NavigationRepository>()
-    private val mediaManager by inject<MediaManager>()
-    private val imageHelper by inject<ImageHelper>()
-    private val userViewsRepository by inject<UserViewsRepository>()
-    private val itemLauncher by inject<ItemLauncher>()
-    private val homePreviewViewModel: HomePreviewViewModel by activityViewModel()
+	private val sessionRepository by inject<SessionRepository>()
+	private val userRepository by inject<UserRepository>()
+	private val serverRepository by inject<ServerRepository>()
+	private val notificationRepository by inject<NotificationsRepository>()
+	private val navigationRepository by inject<NavigationRepository>()
+	private val mediaManager by inject<MediaManager>()
+	private val imageHelper by inject<ImageHelper>()
+	private val userViewsRepository by inject<UserViewsRepository>()
+	private val itemLauncher by inject<ItemLauncher>()
+	private val homePreviewViewModel: HomePreviewViewModel by activityViewModel()
 
-    // View references
-    private lateinit var previewBackground: AsyncImageView
-    private lateinit var previewGradient: View
-    private lateinit var previewTitle: TextView
-    private lateinit var previewDescription: TextView
-    private lateinit var previewYear: TextView
-    private lateinit var previewDuration: TextView
-    private lateinit var previewAgeRating: TextView
-    private lateinit var previewContentType: TextView
-    private lateinit var previewPoster: AsyncImageView
-    private lateinit var contentView: FragmentContainerView
+	// View references
+	private lateinit var previewBackground: AsyncImageView
+	private lateinit var previewGradient: View
+	private lateinit var previewTitle: TextView
+	private lateinit var previewDescription: TextView
+	private lateinit var previewYear: TextView
+	private lateinit var previewDuration: TextView
+	private lateinit var previewAgeRating: TextView
+	private lateinit var previewContentType: TextView
+	private lateinit var previewPoster: AsyncImageView
+	private lateinit var contentView: FragmentContainerView
 
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
-        val view = inflater.inflate(R.layout.fragment_home_netflix_style, container, false)
+	override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
+		val view = inflater.inflate(R.layout.fragment_home_netflix_style, container, false)
 
-        // Initialize view references
-        previewBackground = view.findViewById(R.id.preview_background)
-        previewGradient = view.findViewById(R.id.preview_gradient)
-        previewTitle = view.findViewById(R.id.preview_title)
-        previewDescription = view.findViewById(R.id.preview_description)
-        previewYear = view.findViewById(R.id.preview_year)
-        previewDuration = view.findViewById(R.id.preview_duration)
-        previewAgeRating = view.findViewById(R.id.preview_age_rating)
-        previewContentType = view.findViewById(R.id.preview_content_type)
-        previewPoster = view.findViewById(R.id.preview_poster)
-        contentView = view.findViewById(R.id.content_view)
+		// Initialize view references
+		previewBackground = view.findViewById(R.id.preview_background)
+		previewGradient = view.findViewById(R.id.preview_gradient)
+		previewTitle = view.findViewById(R.id.preview_title)
+		previewDescription = view.findViewById(R.id.preview_description)
+		previewYear = view.findViewById(R.id.preview_year)
+		previewDuration = view.findViewById(R.id.preview_duration)
+		previewAgeRating = view.findViewById(R.id.preview_age_rating)
+		previewContentType = view.findViewById(R.id.preview_content_type)
+		previewPoster = view.findViewById(R.id.preview_poster)
+		contentView = view.findViewById(R.id.content_view)
 
-        // Setup glassmorphic toolbar
-        setupGlassmorphicToolbar(view)
+		// Setup glassmorphic toolbar
+		setupGlassmorphicToolbar(view)
 
-        return view
-    }
+		return view
+	}
 
-    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        super.onViewCreated(view, savedInstanceState)
+	override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+		super.onViewCreated(view, savedInstanceState)
 
-        sessionRepository.currentSession
-            .flowWithLifecycle(viewLifecycleOwner.lifecycle, Lifecycle.State.STARTED)
-            .map { session ->
-                if (session == null) null
-                else serverRepository.getServer(session.serverId)
-            }
-            .onEach { server ->
-                notificationRepository.updateServerNotifications(server)
-            }
-            .launchIn(viewLifecycleOwner.lifecycleScope)
+		sessionRepository.currentSession
+			.flowWithLifecycle(viewLifecycleOwner.lifecycle, Lifecycle.State.STARTED)
+			.map { session ->
+				if (session == null) null
+				else serverRepository.getServer(session.serverId)
+			}
+			.onEach { server ->
+				notificationRepository.updateServerNotifications(server)
+			}
+			.launchIn(viewLifecycleOwner.lifecycleScope)
 
-        // Set up communication with HomeRowsFragment
-        setupRowsFragmentListener()
-    }
+		// Set up communication with HomeRowsFragment
+		setupRowsFragmentListener()
+	}
 
-    private fun setupRowsFragmentListener() {
-        // Observe selected item changes from HomeRowsFragment
-        homePreviewViewModel.selectedItem
-            .flowWithLifecycle(viewLifecycleOwner.lifecycle, Lifecycle.State.STARTED)
-            .onEach { item ->
-                updatePreviewSection(item)
-            }
-            .launchIn(viewLifecycleOwner.lifecycleScope)
-    }
+	private fun setupRowsFragmentListener() {
+		// Observe selected item changes from HomeRowsFragment
+		homePreviewViewModel.selectedItem
+			.flowWithLifecycle(viewLifecycleOwner.lifecycle, Lifecycle.State.STARTED)
+			.onEach { item ->
+				updatePreviewSection(item)
+			}
+			.launchIn(viewLifecycleOwner.lifecycleScope)
+	}
 
-    fun updatePreviewSection(item: BaseRowItem?) {
-        if (item == null || item.baseItem == null) {
-            // Hide and clear preview when no item is selected
-            previewBackground.visibility = View.GONE
-            previewGradient.visibility = View.GONE
-            previewBackground.setImageDrawable(null)
-            previewTitle.text = ""
-            previewDescription.text = ""
-            previewContentType.visibility = View.GONE
-            previewYear.visibility = View.GONE
-            previewDuration.visibility = View.GONE
-            previewAgeRating.visibility = View.GONE
-            return
-        }
+	fun updatePreviewSection(item: BaseRowItem?) {
+		if (item == null || item.baseItem == null) {
+			// Hide and clear preview when no item is selected
+			previewBackground.visibility = View.GONE
+			previewGradient.visibility = View.GONE
+			previewBackground.setImageDrawable(null)
+			previewTitle.text = ""
+			previewDescription.text = ""
+			previewContentType.visibility = View.GONE
+			previewYear.visibility = View.GONE
+			previewDuration.visibility = View.GONE
+			previewAgeRating.visibility = View.GONE
+			return
+		}
 
-        val baseItem = item.baseItem
+		val baseItem = item.baseItem
 
-        // Update background image
-        val backdropImage = when {
-            // First try item's own backdrops
-            baseItem.itemBackdropImages.isNotEmpty() -> baseItem.itemBackdropImages.firstOrNull()
-            baseItem.itemImages[ImageType.BACKDROP] != null -> baseItem.itemImages[ImageType.BACKDROP]
-            // For episodes, try parent backdrops
-            baseItem.parentBackdropImages.isNotEmpty() -> baseItem.parentBackdropImages.firstOrNull()
-            // For episodes, use primary image (screenshot) as fallback
-            baseItem.type == BaseItemKind.EPISODE && baseItem.itemImages[ImageType.PRIMARY] != null ->
-                baseItem.itemImages[ImageType.PRIMARY]
-            // Last resort: try series thumb
-            baseItem.type == BaseItemKind.EPISODE && baseItem.seriesThumbImage != null ->
-                baseItem.seriesThumbImage
-            else -> null
-        }
+		// Update background image
+		val backdropImage = when {
+			// First try item's own backdrops
+			baseItem.itemBackdropImages.isNotEmpty() -> baseItem.itemBackdropImages.firstOrNull()
+			baseItem.itemImages[ImageType.BACKDROP] != null -> baseItem.itemImages[ImageType.BACKDROP]
+			// For episodes, try parent backdrops
+			baseItem.parentBackdropImages.isNotEmpty() -> baseItem.parentBackdropImages.firstOrNull()
+			// For episodes, use primary image (screenshot) as fallback
+			baseItem.type == BaseItemKind.EPISODE && baseItem.itemImages[ImageType.PRIMARY] != null ->
+				baseItem.itemImages[ImageType.PRIMARY]
+			// Last resort: try series thumb
+			baseItem.type == BaseItemKind.EPISODE && baseItem.seriesThumbImage != null ->
+				baseItem.seriesThumbImage
 
-        if (backdropImage != null) {
-            val backdropUrl = imageHelper.getImageUrl(backdropImage)
+			else -> null
+		}
 
-            // Load image with a callback to show views only after loading
-            previewBackground.doOnAttach {
-                it.findViewTreeLifecycleOwner()?.lifecycleScope?.launch {
-                    // Load the image first
-                    previewBackground.load(backdropUrl, blurHash = null) // No blur hash to avoid placeholder
-                    // Then show both views
-                    previewBackground.visibility = View.VISIBLE
-                    previewGradient.visibility = View.VISIBLE
-                }
-            }
-        } else {
-            // Hide background when no backdrop is available
-            previewBackground.visibility = View.GONE
-            previewGradient.visibility = View.GONE
-            previewBackground.setImageDrawable(null)
-        }
+		if (backdropImage != null) {
+			val backdropUrl = imageHelper.getImageUrl(backdropImage)
 
-        // Update title
-        previewTitle.text = baseItem.name
+			// Load image with a callback to show views only after loading
+			previewBackground.doOnAttach {
+				it.findViewTreeLifecycleOwner()?.lifecycleScope?.launch {
+					// Load the image first
+					previewBackground.load(backdropUrl, blurHash = null) // No blur hash to avoid placeholder
+					// Then show both views
+					previewBackground.visibility = View.VISIBLE
+					previewGradient.visibility = View.VISIBLE
+				}
+			}
+		} else {
+			// Hide background when no backdrop is available
+			previewBackground.visibility = View.GONE
+			previewGradient.visibility = View.GONE
+			previewBackground.setImageDrawable(null)
+		}
 
-        // Update description
-        previewDescription.text = baseItem.overview ?: ""
+		// Update title
+		previewTitle.text = baseItem.name
 
-        // Update metadata
-        updateMetadata(baseItem)
+		// Update description
+		previewDescription.text = baseItem.overview ?: ""
 
-        // Keep poster hidden - don't show the card on top right
-        previewPoster.visibility = View.GONE
-    }
+		// Update metadata
+		updateMetadata(baseItem)
 
-    private fun updateMetadata(item: BaseItemDto) {
-        // Content type
-        when (item.type) {
-            BaseItemKind.MOVIE -> {
-                previewContentType.text = requireContext().getString(R.string.lbl_movie)
-                previewContentType.visibility = View.VISIBLE
-            }
-            BaseItemKind.SERIES -> {
-                previewContentType.text = requireContext().getString(R.string.lbl_series)
-                previewContentType.visibility = View.VISIBLE
-            }
-            BaseItemKind.EPISODE -> {
-                previewContentType.text = requireContext().getString(R.string.lbl_episode)
-                previewContentType.visibility = View.VISIBLE
-            }
-            else -> previewContentType.visibility = View.GONE
-        }
+		// Keep poster hidden - don't show the card on top right
+		previewPoster.visibility = View.GONE
+	}
 
-        // Year
-        item.productionYear?.let { year ->
-            previewYear.text = year.toString()
-            previewYear.visibility = View.VISIBLE
-        } ?: run { previewYear.visibility = View.GONE }
+	private fun updateMetadata(item: BaseItemDto) {
+		// Content type
+		when (item.type) {
+			BaseItemKind.MOVIE -> {
+				previewContentType.text = requireContext().getString(R.string.lbl_movie)
+				previewContentType.visibility = View.VISIBLE
+			}
 
-        // Duration
-        item.runTimeTicks?.let { ticks ->
-            val minutes = ticks / 600_000_000L
-            previewDuration.text = if (minutes >= 60) {
-                "${minutes / 60}h ${minutes % 60}m"
-            } else {
-                "${minutes}m"
-            }
-            previewDuration.visibility = View.VISIBLE
-        } ?: run { previewDuration.visibility = View.GONE }
+			BaseItemKind.SERIES -> {
+				previewContentType.text = requireContext().getString(R.string.lbl_series)
+				previewContentType.visibility = View.VISIBLE
+			}
 
-        // Age rating
-        item.officialRating?.let { rating ->
-            previewAgeRating.text = rating
-            previewAgeRating.visibility = View.VISIBLE
-        } ?: run { previewAgeRating.visibility = View.GONE }
-    }
+			BaseItemKind.EPISODE -> {
+				previewContentType.text = requireContext().getString(R.string.lbl_episode)
+				previewContentType.visibility = View.VISIBLE
+			}
 
-    private fun switchUser() {
-        mediaManager.clearAudioQueue()
-        sessionRepository.destroyCurrentSession()
+			else -> previewContentType.visibility = View.GONE
+		}
 
-        val selectUserIntent = Intent(activity, StartupActivity::class.java)
-        selectUserIntent.putExtra(StartupActivity.EXTRA_HIDE_SPLASH, true)
-        selectUserIntent.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY)
+		// Year
+		item.productionYear?.let { year ->
+			previewYear.text = year.toString()
+			previewYear.visibility = View.VISIBLE
+		} ?: run { previewYear.visibility = View.GONE }
 
-        activity?.startActivity(selectUserIntent)
-        activity?.finishAfterTransition()
-    }
+		// Duration
+		item.runTimeTicks?.let { ticks ->
+			val minutes = ticks / 600_000_000L
+			previewDuration.text = if (minutes >= 60) {
+				"${minutes / 60}h ${minutes % 60}m"
+			} else {
+				"${minutes}m"
+			}
+			previewDuration.visibility = View.VISIBLE
+		} ?: run { previewDuration.visibility = View.GONE }
 
-    private fun navigateToLibraryType(collectionType: CollectionType) {
-        lifecycleScope.launch {
-            try {
-                val userViews = userViewsRepository.views.first()
-                val libraryView = userViews.find { it.collectionType == collectionType }
+		// Age rating
+		item.officialRating?.let { rating ->
+			previewAgeRating.text = rating
+			previewAgeRating.visibility = View.VISIBLE
+		} ?: run { previewAgeRating.visibility = View.GONE }
+	}
 
-                if (libraryView != null) {
-                    val destination = itemLauncher.getUserViewDestination(libraryView)
-                    navigationRepository.navigate(destination)
-                } else {
-                    // Fallback: navigate to generic library browser if specific type not found
-                    val firstView = userViews.firstOrNull()
-                    if (firstView != null) {
-                        navigationRepository.navigate(Destinations.libraryBrowser(firstView))
-                    }
-                }
-            } catch (e: Exception) {
-                // Handle error gracefully - could show a toast or log the error
-                timber.log.Timber.e(e, "Failed to navigate to library type: $collectionType")
-            }
-        }
-    }
+	private fun switchUser() {
+		mediaManager.clearAudioQueue()
+		sessionRepository.destroyCurrentSession()
 
-    private fun setupGlassmorphicToolbar(view: View) {
-        // Search button
-        view.findViewById<View>(R.id.toolbar_search)?.setOnClickListener {
-            navigationRepository.navigate(Destinations.search())
-        }
+		val selectUserIntent = Intent(activity, StartupActivity::class.java)
+		selectUserIntent.putExtra(StartupActivity.EXTRA_HIDE_SPLASH, true)
+		selectUserIntent.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY)
 
-        // Set up dynamic navigation tabs
-        setupDynamicNavigationTabs(view)
+		activity?.startActivity(selectUserIntent)
+		activity?.finishAfterTransition()
+	}
 
-        // User avatar container
-        val userAvatarContainer = view.findViewById<View>(R.id.toolbar_user_avatar_container)
-        userAvatarContainer?.setOnClickListener {
-            switchUser()
-        }
+	private fun navigateToLibraryType(collectionType: CollectionType) {
+		lifecycleScope.launch {
+			try {
+				val userViews = userViewsRepository.views.first()
+				val libraryView = userViews.find { it.collectionType == collectionType }
 
-        // Get the actual user avatar for loading image
-        val userAvatar = view.findViewById<AsyncImageView>(R.id.toolbar_user_avatar)
+				if (libraryView != null) {
+					val destination = itemLauncher.getUserViewDestination(libraryView)
+					navigationRepository.navigate(destination)
+				} else {
+					// Fallback: navigate to generic library browser if specific type not found
+					val firstView = userViews.firstOrNull()
+					if (firstView != null) {
+						navigationRepository.navigate(Destinations.libraryBrowser(firstView))
+					}
+				}
+			} catch (e: Exception) {
+				// Handle error gracefully - could show a toast or log the error
+				timber.log.Timber.e(e, "Failed to navigate to library type: $collectionType")
+			}
+		}
+	}
 
-        // Load user avatar image
-        lifecycleScope.launch {
-            userRepository.currentUser.filterNotNull().collect { user ->
-                user?.let {
-                    val imageUrl = imageHelper.getPrimaryImageUrl(it)
-                    userAvatar?.load(imageUrl)
-                }
-            }
-        }
-    }
+	private fun setupGlassmorphicToolbar(view: View) {
+		// Search button
+		view.findViewById<View>(R.id.toolbar_search)?.setOnClickListener {
+			navigationRepository.navigate(Destinations.search())
+		}
 
-    private fun setupDynamicNavigationTabs(view: View) {
-        lifecycleScope.launch {
-            try {
-                val userViews = userViewsRepository.views.first()
-                val navContainer = view.findViewById<ViewGroup>(R.id.nav_pills_container)
+		// Set up dynamic navigation tabs
+		setupDynamicNavigationTabs(view)
 
-                // Clear existing dynamic tabs (keep only static ones)
-                navContainer?.removeAllViews()
+		// User avatar container
+		val userAvatarContainer = view.findViewById<View>(R.id.toolbar_user_avatar_container)
+		userAvatarContainer?.setOnClickListener {
+			switchUser()
+		}
 
-                // Create tabs based on available libraries
-                var previousButtonId: Int? = null
-                var firstLibraryButtonId: Int? = null
+		// Get the actual user avatar for loading image
+		val userAvatar = view.findViewById<AsyncImageView>(R.id.toolbar_user_avatar)
 
-                for (userView in userViews) {
-                    val tabButton = createNavTab(userView)
-                    if (tabButton != null) {
-                        navContainer?.addView(tabButton)
+		// Load user avatar image
+		lifecycleScope.launch {
+			userRepository.currentUser.filterNotNull().collect { user ->
+				user.let {
+					val imageUrl = imageHelper.getPrimaryImageUrl(it)
+					userAvatar?.load(imageUrl)
+				}
+			}
+		}
+	}
 
-                        // Set up focus navigation
-                        if (previousButtonId != null) {
-                            tabButton.nextFocusLeftId = previousButtonId
-                            view.findViewById<View>(previousButtonId)?.nextFocusRightId = tabButton.id
-                        } else {
-                            firstLibraryButtonId = tabButton.id
-                            // Connect search button to first library tab
-                            view.findViewById<View>(R.id.toolbar_search)?.nextFocusRightId = tabButton.id
-                        }
+	private fun setupDynamicNavigationTabs(view: View) {
+		lifecycleScope.launch {
+			try {
+				val userViews = userViewsRepository.views.first()
+				val navContainer = view.findViewById<ViewGroup>(R.id.nav_pills_container)
 
-                        previousButtonId = tabButton.id
-                    }
-                }
+				// Clear existing dynamic tabs (keep only static ones)
+				navContainer?.removeAllViews()
 
-                // Add Jellyfin tab (always present)
-                val jellyfinTab = createJellyfinTab()
-                navContainer?.addView(jellyfinTab)
+				// Create tabs based on available libraries
+				var previousButtonId: Int? = null
 
-                // Set up focus navigation for Jellyfin tab
-                if (previousButtonId != null) {
-                    jellyfinTab.nextFocusLeftId = previousButtonId
-                    view.findViewById<View>(previousButtonId)?.nextFocusRightId = jellyfinTab.id
-                } else {
-                    // If no libraries, connect search directly to Jellyfin
-                    view.findViewById<View>(R.id.toolbar_search)?.nextFocusRightId = jellyfinTab.id
-                }
+				for (userView in userViews) {
+					val tabButton = createNavTab(userView)
+					if (tabButton != null) {
+						navContainer?.addView(tabButton)
 
-                // Connect last tab to user avatar
-                jellyfinTab.nextFocusRightId = R.id.toolbar_user_avatar
-                view.findViewById<View>(R.id.toolbar_user_avatar)?.nextFocusLeftId = jellyfinTab.id
+						// Set up focus navigation
+						if (previousButtonId != null) {
+							tabButton.nextFocusLeftId = previousButtonId
+							view.findViewById<View>(previousButtonId)?.nextFocusRightId = tabButton.id
+						} else {
+							// Connect search button to first library tab
+							view.findViewById<View>(R.id.toolbar_search)?.nextFocusRightId = tabButton.id
+						}
 
-            } catch (e: Exception) {
-                timber.log.Timber.e(e, "Failed to set up dynamic navigation tabs")
-                // Fallback to static tabs if dynamic setup fails
-                setupStaticNavigationTabs(view)
-            }
-        }
-    }
+						previousButtonId = tabButton.id
+					}
+				}
 
-    private fun createNavTab(userView: BaseItemDto): TextView? {
-        val displayName = getDisplayNameForCollectionType( userView.collectionType, userView.name)
-        if (displayName == null) return null
+				// Add Jellyfin tab (always present)
+				val jellyfinTab = createJellyfinTab()
+				navContainer?.addView(jellyfinTab)
 
-        return TextView(requireContext()).apply {
-            id = View.generateViewId()
-            layoutParams = ViewGroup.MarginLayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                resources.getDimensionPixelSize(R.dimen.toolbar_nav_button_height)
-            ).apply {
-                leftMargin = resources.getDimensionPixelSize(R.dimen.toolbar_nav_button_margin)
-            }
-            text = displayName
-            textSize = 15f
-            setTextColor(resources.getColorStateList(R.color.nav_text_color, null))
-            typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
-            gravity = android.view.Gravity.CENTER
-            setPadding(
-                resources.getDimensionPixelSize(R.dimen.toolbar_nav_button_padding_horizontal),
-                0,
-                resources.getDimensionPixelSize(R.dimen.toolbar_nav_button_padding_horizontal),
-                0
-            )
-            background = resources.getDrawable(R.drawable.nav_pill_animated_background, null)
-            stateListAnimator = android.animation.AnimatorInflater.loadStateListAnimator(
-                requireContext(),
-                R.animator.nav_button_state_animator
-            )
-            isFocusable = true
-            isClickable = true
+				// Set up focus navigation for Jellyfin tab
+				if (previousButtonId != null) {
+					jellyfinTab.nextFocusLeftId = previousButtonId
+					view.findViewById<View>(previousButtonId)?.nextFocusRightId = jellyfinTab.id
+				} else {
+					// If no libraries, connect search directly to Jellyfin
+					view.findViewById<View>(R.id.toolbar_search)?.nextFocusRightId = jellyfinTab.id
+				}
 
-            setOnClickListener {
-                navigateToSpecificLibrary(userView)
-            }
-        }
-    }
+				// Connect last tab to user avatar
+				jellyfinTab.nextFocusRightId = R.id.toolbar_user_avatar
+				view.findViewById<View>(R.id.toolbar_user_avatar)?.nextFocusLeftId = jellyfinTab.id
 
-    private fun createJellyfinTab(): TextView {
-        return TextView(requireContext()).apply {
-            id = View.generateViewId()
-            layoutParams = ViewGroup.MarginLayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                resources.getDimensionPixelSize(R.dimen.toolbar_nav_button_height)
-            ).apply {
-                leftMargin = resources.getDimensionPixelSize(R.dimen.toolbar_nav_button_margin)
-            }
-            text = "Jellyfin"
-            textSize = 15f
-            setTextColor(resources.getColorStateList(R.color.nav_text_color, null))
-            typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
-            gravity = android.view.Gravity.CENTER
-            setPadding(
-                resources.getDimensionPixelSize(R.dimen.toolbar_nav_button_padding_horizontal),
-                0,
-                resources.getDimensionPixelSize(R.dimen.toolbar_nav_button_padding_horizontal),
-                0
-            )
-            background = resources.getDrawable(R.drawable.nav_pill_animated_background, null)
-            stateListAnimator = android.animation.AnimatorInflater.loadStateListAnimator(
-                requireContext(),
-                R.animator.nav_button_state_animator
-            )
-            isFocusable = true
-            isClickable = true
+			} catch (e: Exception) {
+				timber.log.Timber.e(e, "Failed to set up dynamic navigation tabs")
+				// Fallback to static tabs if dynamic setup fails
+				setupStaticNavigationTabs(view)
+			}
+		}
+	}
 
-            setOnClickListener {
-                startActivity(ActivityDestinations.userPreferences(requireContext()))
-            }
-        }
-    }
+	private fun createNavTab(userView: BaseItemDto): TextView? {
+		val displayName = getDisplayNameForCollectionType(userView.collectionType, userView.name)
+		if (displayName == null) return null
 
-    private fun getDisplayNameForCollectionType(collectionType: CollectionType?, fallbackName: String?): String? {
+		return TextView(requireContext()).apply {
+			id = View.generateViewId()
+			layoutParams = ViewGroup.MarginLayoutParams(
+				ViewGroup.LayoutParams.WRAP_CONTENT,
+				resources.getDimensionPixelSize(R.dimen.toolbar_nav_button_height)
+			).apply {
+				leftMargin = resources.getDimensionPixelSize(R.dimen.toolbar_nav_button_margin)
+			}
+			text = displayName
+			textSize = 15f
+			setTextColor(ContextCompat.getColorStateList(context, R.color.nav_text_color))
+			typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
+			gravity = android.view.Gravity.CENTER
+			setPadding(
+				resources.getDimensionPixelSize(R.dimen.toolbar_nav_button_padding_horizontal),
+				0,
+				resources.getDimensionPixelSize(R.dimen.toolbar_nav_button_padding_horizontal),
+				0
+			)
+			background = ResourcesCompat.getDrawable(resources, R.drawable.nav_pill_animated_background, null)
+			stateListAnimator = android.animation.AnimatorInflater.loadStateListAnimator(
+				requireContext(),
+				R.animator.nav_button_state_animator
+			)
+			isFocusable = true
+			isClickable = true
+
+			setOnClickListener {
+				navigateToSpecificLibrary(userView)
+			}
+		}
+	}
+
+	private fun createJellyfinTab(): TextView {
+		return TextView(requireContext()).apply {
+			id = View.generateViewId()
+			layoutParams = ViewGroup.MarginLayoutParams(
+				ViewGroup.LayoutParams.WRAP_CONTENT,
+				resources.getDimensionPixelSize(R.dimen.toolbar_nav_button_height)
+			).apply {
+				leftMargin = resources.getDimensionPixelSize(R.dimen.toolbar_nav_button_margin)
+			}
+			text = context.getString(R.string.lbl_jellyfin)
+			textSize = 15f
+			setTextColor(ContextCompat.getColorStateList(context, R.color.nav_text_color))
+			typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
+			gravity = android.view.Gravity.CENTER
+			setPadding(
+				resources.getDimensionPixelSize(R.dimen.toolbar_nav_button_padding_horizontal),
+				0,
+				resources.getDimensionPixelSize(R.dimen.toolbar_nav_button_padding_horizontal),
+				0
+			)
+			background = ResourcesCompat.getDrawable(resources, R.drawable.nav_pill_animated_background, null)
+			stateListAnimator = android.animation.AnimatorInflater.loadStateListAnimator(
+				requireContext(),
+				R.animator.nav_button_state_animator
+			)
+			isFocusable = true
+			isClickable = true
+
+			setOnClickListener {
+				startActivity(ActivityDestinations.userPreferences(requireContext()))
+			}
+		}
+	}
+
+	private fun getDisplayNameForCollectionType(collectionType: CollectionType?, fallbackName: String?): String? {
 		val ctx = requireContext()
-        return when (collectionType) {
-            CollectionType.MOVIES ->  ctx.getString(R.string.lbl_movies)
-            CollectionType.TVSHOWS -> ctx.getString(R.string.lbl_tv_show)
-            CollectionType.MUSIC -> ctx.getString(R.string.lbl_music)
-            CollectionType.PHOTOS -> ctx.getString(R.string.lbl_photo)
-            CollectionType.PLAYLISTS -> ctx.getString(R.string.lbl_playlists)
-            CollectionType.LIVETV -> ctx.getString(R.string.lbl_live)
-            CollectionType.BOXSETS -> ctx.getString(R.string.lbl_collections)
-            else -> fallbackName // Use the library's custom name for unknown types
-        }
-    }
+		return when (collectionType) {
+			CollectionType.MOVIES -> ctx.getString(R.string.lbl_movies)
+			CollectionType.TVSHOWS -> ctx.getString(R.string.lbl_tv_show)
+			CollectionType.MUSIC -> ctx.getString(R.string.lbl_music)
+			CollectionType.PHOTOS -> ctx.getString(R.string.lbl_photo)
+			CollectionType.PLAYLISTS -> ctx.getString(R.string.lbl_playlists)
+			CollectionType.LIVETV -> ctx.getString(R.string.lbl_live)
+			CollectionType.BOXSETS -> ctx.getString(R.string.lbl_collections)
+			else -> fallbackName // Use the library's custom name for unknown types
+		}
+	}
 
-    private fun navigateToSpecificLibrary(userView: BaseItemDto) {
-        lifecycleScope.launch {
-            try {
-                val destination = itemLauncher.getUserViewDestination(userView)
-                navigationRepository.navigate(destination)
-            } catch (e: Exception) {
-                timber.log.Timber.e(e, "Failed to navigate to library: ${userView.name}")
-                // Fallback to generic library browser
-                navigationRepository.navigate(Destinations.libraryBrowser(userView))
-            }
-        }
-    }
+	private fun navigateToSpecificLibrary(userView: BaseItemDto) {
+		lifecycleScope.launch {
+			try {
+				val destination = itemLauncher.getUserViewDestination(userView)
+				navigationRepository.navigate(destination)
+			} catch (e: Exception) {
+				timber.log.Timber.e(e, "Failed to navigate to library: ${userView.name}")
+				// Fallback to generic library browser
+				navigationRepository.navigate(Destinations.libraryBrowser(userView))
+			}
+		}
+	}
 
-    private fun setupStaticNavigationTabs(view: View) {
-        // Fallback implementation: create basic tabs when dynamic setup fails
-        val navContainer = view.findViewById<ViewGroup>(R.id.nav_pills_container)
+	private fun setupStaticNavigationTabs(view: View) {
+		// Fallback implementation: create basic tabs when dynamic setup fails
+		val navContainer = view.findViewById<ViewGroup>(R.id.nav_pills_container)
 		val ctx = requireContext()
 
-        // Create static tabs as fallback
-        val moviesTab = createStaticTab(ctx.getString(R.string.lbl_movies)) { navigateToLibraryType(CollectionType.MOVIES) }
-        val showsTab = createStaticTab(ctx.getString(R.string.lbl_tv_show)) { navigateToLibraryType(CollectionType.TVSHOWS) }
-        val playlistsTab = createStaticTab(ctx.getString(R.string.lbl_playlists)) { navigateToLibraryType(CollectionType.PLAYLISTS) }
-        val jellyfinTab = createStaticTab(ctx.getString(R.string.lbl_jellyfin)) { startActivity(ActivityDestinations.userPreferences(requireContext())) }
+		// Create static tabs as fallback
+		val moviesTab = createStaticTab(ctx.getString(R.string.lbl_movies)) { navigateToLibraryType(CollectionType.MOVIES) }
+		val showsTab = createStaticTab(ctx.getString(R.string.lbl_tv_show)) { navigateToLibraryType(CollectionType.TVSHOWS) }
+		val playlistsTab = createStaticTab(ctx.getString(R.string.lbl_playlists)) { navigateToLibraryType(CollectionType.PLAYLISTS) }
+		val jellyfinTab =
+			createStaticTab(ctx.getString(R.string.lbl_jellyfin)) { startActivity(ActivityDestinations.userPreferences(requireContext())) }
 
-        navContainer?.addView(moviesTab)
-        navContainer?.addView(showsTab)
-        navContainer?.addView(playlistsTab)
-        navContainer?.addView(jellyfinTab)
+		navContainer?.addView(moviesTab)
+		navContainer?.addView(showsTab)
+		navContainer?.addView(playlistsTab)
+		navContainer?.addView(jellyfinTab)
 
-        // Set up basic focus navigation
-        view.findViewById<View>(R.id.toolbar_search)?.nextFocusRightId = moviesTab.id
-        moviesTab.nextFocusLeftId = R.id.toolbar_search
-        moviesTab.nextFocusRightId = showsTab.id
-        showsTab.nextFocusLeftId = moviesTab.id
-        showsTab.nextFocusRightId = playlistsTab.id
-        playlistsTab.nextFocusLeftId = showsTab.id
-        playlistsTab.nextFocusRightId = jellyfinTab.id
-        jellyfinTab.nextFocusLeftId = playlistsTab.id
-        jellyfinTab.nextFocusRightId = R.id.toolbar_user_avatar
-        view.findViewById<View>(R.id.toolbar_user_avatar)?.nextFocusLeftId = jellyfinTab.id
-    }
+		// Set up basic focus navigation
+		view.findViewById<View>(R.id.toolbar_search)?.nextFocusRightId = moviesTab.id
+		moviesTab.nextFocusLeftId = R.id.toolbar_search
+		moviesTab.nextFocusRightId = showsTab.id
+		showsTab.nextFocusLeftId = moviesTab.id
+		showsTab.nextFocusRightId = playlistsTab.id
+		playlistsTab.nextFocusLeftId = showsTab.id
+		playlistsTab.nextFocusRightId = jellyfinTab.id
+		jellyfinTab.nextFocusLeftId = playlistsTab.id
+		jellyfinTab.nextFocusRightId = R.id.toolbar_user_avatar
+		view.findViewById<View>(R.id.toolbar_user_avatar)?.nextFocusLeftId = jellyfinTab.id
+	}
 
-    private fun createStaticTab(text: String, onClickListener: () -> Unit): TextView {
-        return TextView(requireContext()).apply {
-            id = View.generateViewId()
-            layoutParams = ViewGroup.MarginLayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                resources.getDimensionPixelSize(R.dimen.toolbar_nav_button_height)
-            ).apply {
-                leftMargin = resources.getDimensionPixelSize(R.dimen.toolbar_nav_button_margin)
-            }
-            this.text = text
-            textSize = 15f
-            setTextColor(resources.getColorStateList(R.color.nav_text_color, null))
-            typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
-            gravity = android.view.Gravity.CENTER
-            setPadding(
-                resources.getDimensionPixelSize(R.dimen.toolbar_nav_button_padding_horizontal),
-                0,
-                resources.getDimensionPixelSize(R.dimen.toolbar_nav_button_padding_horizontal),
-                0
-            )
-            background = resources.getDrawable(R.drawable.nav_pill_animated_background, null)
-            stateListAnimator = android.animation.AnimatorInflater.loadStateListAnimator(
-                requireContext(),
-                R.animator.nav_button_state_animator
-            )
-            isFocusable = true
-            isClickable = true
+	private fun createStaticTab(text: String, onClickListener: () -> Unit): TextView {
+		return TextView(requireContext()).apply {
+			id = View.generateViewId()
+			layoutParams = ViewGroup.MarginLayoutParams(
+				ViewGroup.LayoutParams.WRAP_CONTENT,
+				resources.getDimensionPixelSize(R.dimen.toolbar_nav_button_height)
+			).apply {
+				leftMargin = resources.getDimensionPixelSize(R.dimen.toolbar_nav_button_margin)
+			}
+			this.text = text
+			textSize = 15f
+			setTextColor(ContextCompat.getColorStateList(context, R.color.nav_text_color))
+			typeface = android.graphics.Typeface.create("sans-serif-medium", android.graphics.Typeface.NORMAL)
+			gravity = android.view.Gravity.CENTER
+			setPadding(
+				resources.getDimensionPixelSize(R.dimen.toolbar_nav_button_padding_horizontal),
+				0,
+				resources.getDimensionPixelSize(R.dimen.toolbar_nav_button_padding_horizontal),
+				0
+			)
+			background = ResourcesCompat.getDrawable(resources, R.drawable.nav_pill_animated_background, null)
+			stateListAnimator = android.animation.AnimatorInflater.loadStateListAnimator(
+				requireContext(),
+				R.animator.nav_button_state_animator
+			)
+			isFocusable = true
+			isClickable = true
 
-            setOnClickListener { onClickListener() }
-        }
-    }
+			setOnClickListener { onClickListener() }
+		}
+	}
 }

@@ -108,11 +108,5 @@ class HomeFragmentRecommendedRow(
 			title = context.getString(R.string.home_section_recommended_for_you),
 			recommendationStrategy = RecommendationStrategy.RECOMMENDED_FOR_YOU
 		)
-
-		fun createSimilarToWatchedRow(userViews: Collection<BaseItemDto>) = HomeFragmentRecommendedRow(
-			userViews = userViews,
-			title = "More Like This",
-			recommendationStrategy = RecommendationStrategy.SIMILAR_TO_LIKED
-		)
 	}
 }
