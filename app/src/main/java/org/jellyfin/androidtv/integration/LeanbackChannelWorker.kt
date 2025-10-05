@@ -290,7 +290,7 @@ class LeanbackChannelWorker(
 			val latestEpisodes = async {
 				api.userLibraryApi.getLatestMedia(
 					fields = ItemRepository.itemFields,
-					limit = 50,
+					limit = 15,
 					includeItemTypes = listOf(BaseItemKind.EPISODE),
 					isPlayed = false
 				).content
@@ -299,7 +299,7 @@ class LeanbackChannelWorker(
 			val latestMovies = async {
 				api.userLibraryApi.getLatestMedia(
 					fields = ItemRepository.itemFields,
-					limit = 50,
+					limit = 15,
 					includeItemTypes = listOf(BaseItemKind.MOVIE),
 					isPlayed = false
 				).content
@@ -308,7 +308,7 @@ class LeanbackChannelWorker(
 			val latestMedia = async {
 				api.userLibraryApi.getLatestMedia(
 					fields = ItemRepository.itemFields,
-					limit = 50,
+					limit = 15,
 					includeItemTypes = listOf(BaseItemKind.MOVIE, BaseItemKind.SERIES),
 					isPlayed = false
 				).content

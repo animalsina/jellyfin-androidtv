@@ -89,7 +89,7 @@ class HomeFragmentGenreRow(
 	}
 
 	companion object {
-		private const val ITEM_LIMIT = 50
+		private const val ITEM_LIMIT = 15
 
 		// Common genres that are likely to be found in most libraries
 		private val COMMON_GENRES = listOf(

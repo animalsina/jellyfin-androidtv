@@ -100,7 +100,7 @@ class HomeFragmentRecommendedRow(
 	}
 
 	companion object {
-		private const val ITEM_LIMIT = 50
+		private const val ITEM_LIMIT = 15
 
 		// Factory methods for specific recommendation row types
 		fun createRecommendedForYouRow(context: Context, userViews: Collection<BaseItemDto>) = HomeFragmentRecommendedRow(

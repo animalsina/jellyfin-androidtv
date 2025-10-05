@@ -102,7 +102,7 @@ class HomeFragmentPopularRow(
 	}
 
 	companion object {
-		private const val ITEM_LIMIT = 50
+		private const val ITEM_LIMIT = 15
 
 		// Factory methods for specific popular row types
 		fun createPopularMoviesRow(context: Context, userViews: Collection<BaseItemDto>) = HomeFragmentPopularRow(

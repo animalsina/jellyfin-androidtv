@@ -1,5 +1,6 @@
 package org.jellyfin.androidtv.ui.home
 
+import android.content.Context
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
@@ -127,6 +128,17 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 		mediaManager.addAudioEventListener(this)
 	}
 
+	private suspend fun addRowSequentially(
+		context: Context,
+		cardPresenter: CardPresenter,
+		rowsAdapter: MutableObjectAdapter<Row>,
+		row: HomeFragmentRow
+	) {
+		withContext(Dispatchers.Main) {
+			row.addToRowsAdapter(context, cardPresenter, rowsAdapter)
+		}
+	}
+
 	private fun buildHomeRows() {
 		lifecycleScope.launch(Dispatchers.IO) {
 			val currentUser = withTimeout(30.seconds) {
@@ -188,16 +200,24 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 
 			// Add sections to layout
 			withContext(Dispatchers.Main) {
-				// Clear existing rows
 				(adapter as MutableObjectAdapter<*>).clear()
+			}
 
-				// Use uniform card size (120px) across all rows
-				val cardPresenter = CardPresenter(true, org.jellyfin.androidtv.constant.ImageType.POSTER, 120)
+			val cardPresenter = CardPresenter(true, org.jellyfin.androidtv.constant.ImageType.POSTER, 120)
+			val rowsAdapter = adapter as MutableObjectAdapter<Row>
+			val ctx = requireContext()
 
-				// Add rows in order
-				notificationsRow.addToRowsAdapter(requireContext(), cardPresenter, adapter as MutableObjectAdapter<Row>)
-				nowPlaying.addToRowsAdapter(requireContext(), cardPresenter, adapter as MutableObjectAdapter<Row>)
-				for (row in rows) row.addToRowsAdapter(requireContext(), cardPresenter, adapter as MutableObjectAdapter<Row>)
+			// Mostra prima le righe speciali subito
+			withContext(Dispatchers.Main) {
+				notificationsRow.addToRowsAdapter(ctx, cardPresenter, rowsAdapter)
+				nowPlaying.addToRowsAdapter(ctx, cardPresenter, rowsAdapter)
+			}
+
+			// Ora carica ogni riga “normale” una alla volta, con un leggero ritardo
+			for (row in rows) {
+				if (!isActive) break
+				addRowSequentially(ctx, cardPresenter, rowsAdapter, row)
+				delay(1000) // 👈 tempo di attesa tra una riga e l’altra (puoi aumentare o togliere)
 			}
 		}
 	}

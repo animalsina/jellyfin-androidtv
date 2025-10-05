@@ -33,7 +33,7 @@ class GenericFolderFragment : EnhancedBrowseFragment() {
 				val resume = GetItemsRequest(
 					fields = ItemRepository.itemFields,
 					parentId = mFolder.id,
-					limit = 50,
+					limit = 15,
 					filters = setOf(ItemFilter.IS_RESUMABLE),
 					sortBy = setOf(ItemSortBy.DATE_PLAYED),
 					sortOrder = setOf(SortOrder.DESCENDING),
@@ -44,7 +44,7 @@ class GenericFolderFragment : EnhancedBrowseFragment() {
 			val latest = GetItemsRequest(
 				fields = ItemRepository.itemFields,
 				parentId = mFolder.id,
-				limit = 50,
+				limit = 15,
 				filters = setOf(ItemFilter.IS_UNPLAYED),
 				sortBy = setOf(ItemSortBy.DATE_CREATED),
 				sortOrder = setOf(SortOrder.DESCENDING),

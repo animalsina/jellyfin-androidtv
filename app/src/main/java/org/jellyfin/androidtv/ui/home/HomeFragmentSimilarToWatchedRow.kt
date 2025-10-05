@@ -65,7 +65,7 @@ class HomeFragmentSimilarToWatchedRow(
 	}
 
 	companion object {
-		private const val ITEM_LIMIT = 50
+		private const val ITEM_LIMIT = 15
 
 		// Factory method
 		fun create(context: Context, userViews: Collection<BaseItemDto>) = HomeFragmentSimilarToWatchedRow(

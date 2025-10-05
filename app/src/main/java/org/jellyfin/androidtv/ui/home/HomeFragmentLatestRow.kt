@@ -53,6 +53,6 @@ class HomeFragmentLatestRow(
 		)
 
 		// Maximum amount of items loaded for a row
-		private const val ITEM_LIMIT = 50
+		private const val ITEM_LIMIT = 15
 	}
 }

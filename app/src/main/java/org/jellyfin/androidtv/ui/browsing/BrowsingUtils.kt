@@ -63,7 +63,7 @@ object BrowsingUtils {
 
 	@JvmStatic
 	fun createGetNextUpRequest(parentId: UUID) = GetNextUpRequest(
-		limit = 50,
+		limit = 15,
 		parentId = parentId,
 		imageTypeLimit = 1,
 		fields = ItemRepository.itemFields
@@ -84,7 +84,7 @@ object BrowsingUtils {
 	) = GetLatestMediaRequest(
 		fields = ItemRepository.itemFields,
 		parentId = parentId,
-		limit = 50,
+		limit = 15,
 		imageTypeLimit = 1,
 		includeItemTypes = itemType?.let(::setOf),
 		groupItems = groupItems,
@@ -219,7 +219,7 @@ object BrowsingUtils {
 		recursive = true,
 		parentId = parentId,
 		imageTypeLimit = 1,
-		limit = 50,
+		limit = 15,
 		collapseBoxSetItems = false,
 		enableTotalRecordCount = false,
 		filters = setOf(ItemFilter.IS_RESUMABLE),
@@ -275,7 +275,7 @@ object BrowsingUtils {
 		sortBy = setOf(ItemSortBy.DATE_PLAYED),
 		sortOrder = setOf(SortOrder.DESCENDING),
 		enableTotalRecordCount = false,
-		limit = 50,
+		limit = 15,
 	)
 
 	@JvmStatic
