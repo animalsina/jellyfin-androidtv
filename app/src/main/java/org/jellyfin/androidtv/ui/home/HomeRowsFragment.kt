@@ -213,11 +213,11 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 				nowPlaying.addToRowsAdapter(ctx, cardPresenter, rowsAdapter)
 			}
 
-			// Ora carica ogni riga “normale” una alla volta, con un leggero ritardo
+			// Carica ogni riga “normale” una alla volta, con un leggero ritardo
 			for (row in rows) {
 				if (!isActive) break
 				addRowSequentially(ctx, cardPresenter, rowsAdapter, row)
-				delay(1000) // 👈 tempo di attesa tra una riga e l’altra (puoi aumentare o togliere)
+				delay(1000) // 👈 tempo di attesa tra una riga e l’altra
 			}
 		}
 	}
