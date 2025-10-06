@@ -5,9 +5,6 @@ import android.graphics.drawable.Drawable;
 import android.util.TypedValue;
 import android.view.View;
 import android.view.ViewGroup;
-import android.webkit.WebSettings;
-import android.webkit.WebView;
-import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
 
 import androidx.annotation.Nullable;
@@ -29,10 +26,7 @@ import org.jellyfin.androidtv.util.apiclient.JellyfinImageKt;
 import org.jellyfin.sdk.model.api.BaseItemDto;
 import org.jellyfin.sdk.model.api.BaseItemKind;
 import org.jellyfin.sdk.model.api.UserItemDataDto;
-import org.jspecify.annotations.NonNull;
 import org.koin.java.KoinJavaComponent;
-
-import java.util.concurrent.ConcurrentHashMap;
 
 import kotlin.Lazy;
 
@@ -43,11 +37,7 @@ public class CardPresenter extends Presenter {
     private double aspect;
     private boolean mShowInfo = true;
     private boolean isUniformAspect = false;
-    private final Lazy<ImageHelper> imageHelper = KoinJavaComponent.<ImageHelper>inject(ImageHelper.class);
-
-    private static final int DELAY_MS = 5000;
-    private final ConcurrentHashMap<String, String> trailerCache = new ConcurrentHashMap<>();
-    private static final boolean ENABLE_VIDEO_PREVIEW = true;
+    private final Lazy<ImageHelper> imageHelper = KoinJavaComponent.inject(ImageHelper.class);
 
     public CardPresenter() { super(); }
     public CardPresenter(boolean showInfo) { this(); mShowInfo = showInfo; }
@@ -59,10 +49,8 @@ public class CardPresenter extends Presenter {
         private int cardHeight = 140;
 
         private BaseRowItem mItem;
-        private LegacyImageCardView mCardView;
+        private final LegacyImageCardView mCardView;
         private Drawable mDefaultCardImage;
-
-        WebView webView;
 
         public ViewHolder(View view) {
             super(view);
@@ -70,18 +58,6 @@ public class CardPresenter extends Presenter {
             mDefaultCardImage = ContextCompat.getDrawable(mCardView.getContext(), R.drawable.tile_port_video);
 
             FrameLayout trailerContainer = new FrameLayout(mCardView.getContext());
-            webView = new WebView(mCardView.getContext());
-            webView.setLayoutParams(new FrameLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.MATCH_PARENT
-            ));
-            webView.setWebViewClient(new WebViewClient());
-            WebSettings settings = webView.getSettings();
-            settings.setLoadWithOverviewMode(true);
-            settings.setUseWideViewPort(true);
-
-            trailerContainer.addView(webView);
-            trailerContainer.setVisibility(View.GONE);
             mCardView.addView(trailerContainer);
         }
 
@@ -100,7 +76,8 @@ public class CardPresenter extends Presenter {
 
                 if (imageType.equals(ImageType.BANNER)) aspect = ImageHelper.ASPECT_RATIO_BANNER;
                 else if (imageType.equals(ImageType.THUMB)) aspect = ImageHelper.ASPECT_RATIO_16_9;
-                else aspect = imageHelper.getValue().getImageAspectRatio(itemDto, m.getPreferParentThumb());
+                else if (itemDto != null) aspect = imageHelper.getValue().getImageAspectRatio(itemDto, m.getPreferParentThumb());
+                else aspect = 1.0;
 
                 switch (itemDto.getType()) {
                     case AUDIO:
@@ -181,7 +158,6 @@ public class CardPresenter extends Presenter {
             mCardView.setRating(null);
             mCardView.setBadgeImage(null);
             mCardView.getMainImageView().setImageDrawable(null);
-            webView.loadUrl("about:blank");
         }
     }
 

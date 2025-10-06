@@ -297,7 +297,7 @@ class HomeFragmentNetflixStyle : Fragment() {
 				}
 			} catch (e: Exception) {
 				// Handle error gracefully - could show a toast or log the error
-				timber.log.Timber.e(e, "Failed to navigate to library type: $collectionType")
+				Timber.e(e, "Failed to navigate to library type: $collectionType")
 			}
 		}
 	}
@@ -477,7 +477,7 @@ class HomeFragmentNetflixStyle : Fragment() {
 				val destination = itemLauncher.getUserViewDestination(userView)
 				navigationRepository.navigate(destination)
 			} catch (e: Exception) {
-				timber.log.Timber.e(e, "Failed to navigate to library: ${userView.name}")
+				Timber.e(e, "Failed to navigate to library: ${userView.name}")
 				// Fallback to generic library browser
 				navigationRepository.navigate(Destinations.libraryBrowser(userView))
 			}
@@ -553,12 +553,15 @@ class HomeFragmentNetflixStyle : Fragment() {
 		if (trailerCache.containsKey(itemId)) {
 			startTrailer(trailerCache[itemId]!!)
 		} else {
-			var trailerName = "\"${baseItem.name}\""
+			var trailerName = "${baseItem.name}[Movie]"
 			if (baseItem.type == BaseItemKind.EPISODE) {
-				trailerName = "\"${baseItem.seriesName}\""
+				trailerName = "${baseItem.seriesName}[Series] "
 			}
 
 			trailerName = trailerName + " (${baseItem.productionYear}) official trailer"
+			if(baseItem.tags != null){
+				trailerName = trailerName + " " + baseItem.tags?.joinToString(" ")
+			}
 			Timber.d("Fetching trailer for $trailerName")
 			fetchTrailerFromYouTube(trailerName) { videoId ->
 				if (videoId.isNotEmpty()) {
@@ -572,13 +575,91 @@ class HomeFragmentNetflixStyle : Fragment() {
 	}
 
 	private fun startTrailer(videoId: String) {
+		// Imposta dimensioni WebView
 		trailerContainer.layoutParams.width = previewBackground.width
 		trailerContainer.layoutParams.height = previewBackground.height
 		trailerContainer.requestLayout()
+
+		// Nascondi WebView inizialmente
 		trailerContainer.visibility = View.VISIBLE
+		trailerContainer.alpha = 0f // invisibile ma occupa spazio
+
 		val embedUrl = "https://www.youtube.com/embed/$videoId?autoplay=1&mute=1&controls=0"
+
+		// WebViewClient per rilevare caricamento
+		trailerWebView.webViewClient = object : WebViewClient() {
+			override fun onPageFinished(view: WebView?, url: String?) {
+				super.onPageFinished(view, url)
+
+				trailerWebView.evaluateJavascript(
+					"""
+                (function() {
+                    var errorMessage = document.querySelector('.ytp-error .ytp-error-content-wrap');
+                    return errorMessage ? errorMessage.innerText : '';
+                })();
+                """
+				) { result ->
+					val text = result.trim('"')  // rimuove le virgolette di ritorno JS
+					if (text.contains("Video unavailable", ignoreCase = true)) {
+						Timber.w("Trailer non disponibile")
+						resetTrailer()
+					} else if (text.contains("This video is age-restricted and only available on YouTube", ignoreCase = true)) {
+						Timber.w("Trailer non disponibile")
+						resetTrailer()
+					} else {
+						// Mostra la WebView solo se il video è disponibile
+						// Dopo 1.2s simuliamo caricamento e rendiamo visibile
+						viewLifecycleOwner.lifecycleScope.launch {
+							delay(1200)
+							if (isAdded && isVisible) {
+								trailerContainer.animate()
+									.alpha(1f)
+									.setDuration(300)
+									.start()
+								Timber.d("Trailer mostrato: $embedUrl")
+							}
+						}
+					}
+				}
+			}
+			override fun onReceivedError(
+				view: WebView?,
+				request: android.webkit.WebResourceRequest?,
+				error: android.webkit.WebResourceError?
+			) {
+				super.onReceivedError(view, request, error)
+				Timber.w("Errore caricamento trailer: ${error?.description}")
+				resetTrailer() // nascondi WebView
+			}
+
+			override fun onReceivedHttpError(
+				view: WebView?,
+				request: android.webkit.WebResourceRequest?,
+				errorResponse: android.webkit.WebResourceResponse?
+			) {
+				super.onReceivedHttpError(view, request, errorResponse)
+				Timber.w("HTTP error loading trailer: ${errorResponse?.statusCode}")
+				resetTrailer()
+			}
+		}
+
 		trailerWebView.loadUrl(embedUrl)
-		Timber.d("Playing trailer: $embedUrl")
+		Timber.d("Trailer caricato in background: $embedUrl")
+
+		viewLifecycleOwner.lifecycleScope.launch {
+			delay(30_000) // 30 secondi
+			if (isAdded && trailerContainer.visibility == View.VISIBLE) {
+				trailerContainer.animate()
+					.alpha(0f)
+					.setDuration(800)
+					.withEndAction {
+						trailerContainer.visibility = View.GONE
+						trailerWebView.loadUrl("about:blank") // libera la memoria
+					}
+					.start()
+				Timber.d("Trailer nascosto dopo 30s")
+			}
+		}
 	}
 
 	private fun fetchTrailerFromYouTube(query: String, callback: (String) -> Unit) {
@@ -624,8 +705,10 @@ class HomeFragmentNetflixStyle : Fragment() {
 
 	private fun resetTrailer() {
 		trailerJob?.cancel()
+		trailerWebView.stopLoading()
 		trailerWebView.loadUrl("about:blank")
 		trailerContainer.visibility = View.GONE
+		trailerContainer.alpha = 0f
 	}
 
 	fun playYouTubeTrailerWithDelay(item: BaseRowItem) {
@@ -635,9 +718,8 @@ class HomeFragmentNetflixStyle : Fragment() {
 		trailerJob = viewLifecycleOwner.lifecycleScope.launch {
 			delay(5000) // 5 secondi
 
-			// Controlla se il fragment è ancora visibile
 			if (isAdded && isVisible) {
-				playYouTubeTrailer(item) // Funzione che lanciava il trailer
+				playYouTubeTrailer(item) // chiama la versione aggiornata
 			}
 		}
 	}
