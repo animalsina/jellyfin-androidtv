@@ -5,6 +5,9 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import android.widget.FrameLayout
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.core.content.res.ResourcesCompat
@@ -15,12 +18,16 @@ import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.findViewTreeLifecycleOwner
 import androidx.core.view.doOnAttach
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.ui.AsyncImageView
 import org.jellyfin.androidtv.auth.repository.ServerRepository
@@ -46,6 +53,8 @@ import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.CollectionType
 import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.activityViewModel
+import timber.log.Timber
+import java.net.URLEncoder
 
 class HomeFragmentNetflixStyle : Fragment() {
 	private val sessionRepository by inject<SessionRepository>()
@@ -70,6 +79,12 @@ class HomeFragmentNetflixStyle : Fragment() {
 	private lateinit var previewContentType: TextView
 	private lateinit var previewPoster: AsyncImageView
 	private lateinit var contentView: FragmentContainerView
+	private lateinit var previewSubtitle: TextView
+	// Trailer
+	private lateinit var trailerContainer: FrameLayout
+	private lateinit var trailerWebView: WebView
+	private val trailerCache = mutableMapOf<String, String>()
+	private var trailerJob: Job? = null
 
 	override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
 		val view = inflater.inflate(R.layout.fragment_home_netflix_style, container, false)
@@ -85,6 +100,19 @@ class HomeFragmentNetflixStyle : Fragment() {
 		previewContentType = view.findViewById(R.id.preview_content_type)
 		previewPoster = view.findViewById(R.id.preview_poster)
 		contentView = view.findViewById(R.id.content_view)
+		previewSubtitle = view.findViewById(R.id.preview_subtitle)
+
+		// Trailer container sopra il previewBackground
+		trailerContainer = view.findViewById<FrameLayout>(R.id.trailer_container).apply {
+			visibility = View.GONE
+		}
+
+		trailerWebView = view.findViewById<WebView>(R.id.trailer_webview).apply {
+			webViewClient = WebViewClient()
+			settings.loadWithOverviewMode = true
+			settings.useWideViewPort = true
+			settings.javaScriptEnabled = true
+		}
 
 		// Setup glassmorphic toolbar
 		setupGlassmorphicToolbar(view)
@@ -121,17 +149,12 @@ class HomeFragmentNetflixStyle : Fragment() {
 	}
 
 	fun updatePreviewSection(item: BaseRowItem?) {
+		resetTrailerTimer()
+		resetTrailer()
+
 		if (item == null || item.baseItem == null) {
 			// Hide and clear preview when no item is selected
-			previewBackground.visibility = View.GONE
-			previewGradient.visibility = View.GONE
-			previewBackground.setImageDrawable(null)
-			previewTitle.text = ""
-			previewDescription.text = ""
-			previewContentType.visibility = View.GONE
-			previewYear.visibility = View.GONE
-			previewDuration.visibility = View.GONE
-			previewAgeRating.visibility = View.GONE
+			resetPreview()
 			return
 		}
 
@@ -177,6 +200,15 @@ class HomeFragmentNetflixStyle : Fragment() {
 		// Update title
 		previewTitle.text = baseItem.name
 
+		// Sottotitolo solo se episodio
+		if (baseItem.type == BaseItemKind.EPISODE) {
+			previewSubtitle.text = baseItem.seriesName ?: ""
+			previewSubtitle.visibility = View.VISIBLE
+		} else {
+			previewSubtitle.text = ""
+			previewSubtitle.visibility = View.GONE
+		}
+
 		// Update description
 		previewDescription.text = baseItem.overview ?: ""
 
@@ -185,6 +217,9 @@ class HomeFragmentNetflixStyle : Fragment() {
 
 		// Keep poster hidden - don't show the card on top right
 		previewPoster.visibility = View.GONE
+
+		// Avvia timer per il trailer
+		playYouTubeTrailerWithDelay(item)
 	}
 
 	private fun updateMetadata(item: BaseItemDto) {
@@ -344,7 +379,7 @@ class HomeFragmentNetflixStyle : Fragment() {
 				view.findViewById<View>(R.id.toolbar_user_avatar)?.nextFocusLeftId = jellyfinTab.id
 
 			} catch (e: Exception) {
-				timber.log.Timber.e(e, "Failed to set up dynamic navigation tabs")
+				Timber.e(e, "Failed to set up dynamic navigation tabs")
 				// Fallback to static tabs if dynamic setup fails
 				setupStaticNavigationTabs(view)
 			}
@@ -510,4 +545,107 @@ class HomeFragmentNetflixStyle : Fragment() {
 			setOnClickListener { onClickListener() }
 		}
 	}
+
+	private fun playYouTubeTrailer(item: BaseRowItem) {
+		val baseItem = item.baseItem ?: return
+		val itemId = baseItem.id.toString()
+
+		if (trailerCache.containsKey(itemId)) {
+			startTrailer(trailerCache[itemId]!!)
+		} else {
+			var trailerName = "\"${baseItem.name}\""
+			if (baseItem.type == BaseItemKind.EPISODE) {
+				trailerName = "\"${baseItem.seriesName}\""
+			}
+
+			trailerName = trailerName + " (${baseItem.productionYear}) official trailer"
+			Timber.d("Fetching trailer for $trailerName")
+			fetchTrailerFromYouTube(trailerName) { videoId ->
+				if (videoId.isNotEmpty()) {
+					trailerCache[itemId] = videoId
+					startTrailer(videoId)
+				} else {
+					Timber.w("No trailer found for $trailerName")
+				}
+			}
+		}
+	}
+
+	private fun startTrailer(videoId: String) {
+		trailerContainer.layoutParams.width = previewBackground.width
+		trailerContainer.layoutParams.height = previewBackground.height
+		trailerContainer.requestLayout()
+		trailerContainer.visibility = View.VISIBLE
+		val embedUrl = "https://www.youtube.com/embed/$videoId?autoplay=1&mute=1&controls=0"
+		trailerWebView.loadUrl(embedUrl)
+		Timber.d("Playing trailer: $embedUrl")
+	}
+
+	private fun fetchTrailerFromYouTube(query: String, callback: (String) -> Unit) {
+		// Nota: lo scraping di YouTube è fragile, considera YouTube Data API per stabilità
+		Thread {
+			try {
+				val encodedQuery = URLEncoder.encode(query, "UTF-8")
+				val url = "https://www.youtube.com/results?search_query=$encodedQuery"
+				val client = OkHttpClient()
+				val request = Request.Builder().url(url)
+					.header("User-Agent", "Mozilla/5.0")
+					.build()
+				val res = client.newCall(request).execute()
+				val body = res.body?.string() ?: ""
+				val regex = """/watch\?v=([a-zA-Z0-9_-]{11})""".toRegex()
+				val match = regex.find(body)
+				val videoId = match?.groups?.get(1)?.value ?: ""
+				requireActivity().runOnUiThread { callback(videoId) }
+			} catch (e: Exception) {
+				Timber.e(e, "Failed to fetch YouTube trailer")
+				requireActivity().runOnUiThread { callback("") }
+			}
+		}.start()
+	}
+
+	private fun resetPreview() {
+		trailerWebView.loadUrl("about:blank")
+		trailerContainer.visibility = View.GONE
+
+		// Nascondi anche il resto della preview
+		previewBackground.visibility = View.GONE
+		previewGradient.visibility = View.GONE
+		previewBackground.setImageDrawable(null)
+		previewTitle.text = ""
+		previewDescription.text = ""
+		previewContentType.visibility = View.GONE
+		previewYear.visibility = View.GONE
+		previewDuration.visibility = View.GONE
+		previewAgeRating.visibility = View.GONE
+		previewSubtitle.visibility = View.GONE
+		resetTrailerTimer()
+	}
+
+	private fun resetTrailer() {
+		trailerJob?.cancel()
+		trailerWebView.loadUrl("about:blank")
+		trailerContainer.visibility = View.GONE
+	}
+
+	fun playYouTubeTrailerWithDelay(item: BaseRowItem) {
+		// Cancella eventuale trailer pendente
+		trailerJob?.cancel()
+
+		trailerJob = viewLifecycleOwner.lifecycleScope.launch {
+			delay(5000) // 5 secondi
+
+			// Controlla se il fragment è ancora visibile
+			if (isAdded && isVisible) {
+				playYouTubeTrailer(item) // Funzione che lanciava il trailer
+			}
+		}
+	}
+
+	// Quando la preview viene resettata o selezioniamo un nuovo item
+	private fun resetTrailerTimer() {
+		trailerJob?.cancel()
+		trailerJob = null
+	}
+
 }
