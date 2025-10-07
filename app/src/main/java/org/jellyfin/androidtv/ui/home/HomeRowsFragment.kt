@@ -17,12 +17,13 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import org.koin.androidx.viewmodel.ext.android.activityViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
@@ -103,24 +104,24 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 			registerListener(ItemViewSelectedListener())
 		}
 
-		customMessageRepository.message
-			.flowWithLifecycle(lifecycle, Lifecycle.State.RESUMED)
-			.onEach { message ->
-				when (message) {
-					CustomMessage.RefreshCurrentItem -> refreshCurrentItem()
-					else -> Unit
-				}
-			}.launchIn(lifecycleScope)
+		customMessageRepository.message.flowWithLifecycle(lifecycle, Lifecycle.State.RESUMED).onEach { message ->
+			when (message) {
+				CustomMessage.RefreshCurrentItem -> refreshCurrentItem()
+				else -> Unit
+			}
+		}.launchIn(lifecycleScope)
 
 		lifecycleScope.launch {
 			lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-				api.webSocket.subscribe<UserDataChangedMessage>()
-					.onEach { refreshRows(force = true, delayed = false) }
-					.launchIn(this)
+				try {
+					api.webSocket.subscribe<UserDataChangedMessage>()
+						.onEach { refreshRows(force = true, delayed = false) }
+						.launchIn(this)
+				} catch (e: Exception) {
+					Timber.e(e, "WebSocket subscription failed")
+				}
 
-				api.webSocket.subscribe<LibraryChangedMessage>()
-					.onEach { refreshRows(force = true, delayed = false) }
-					.launchIn(this)
+				api.webSocket.subscribe<LibraryChangedMessage>().onEach { refreshRows(force = true, delayed = false) }.launchIn(this)
 			}
 		}
 
@@ -129,10 +130,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	}
 
 	private suspend fun addRowSequentially(
-		context: Context,
-		cardPresenter: CardPresenter,
-		rowsAdapter: MutableObjectAdapter<Row>,
-		row: HomeFragmentRow
+		context: Context, cardPresenter: CardPresenter, rowsAdapter: MutableObjectAdapter<Row>, row: HomeFragmentRow
 	) {
 		withContext(Dispatchers.Main) {
 			row.addToRowsAdapter(context, cardPresenter, rowsAdapter)
@@ -140,22 +138,16 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	}
 
 	private fun buildHomeRows() {
-		lifecycleScope.launch(Dispatchers.IO) {
+		lifecycleScope.launch {
 			val currentUser = withTimeout(30.seconds) {
 				userRepository.currentUser.filterNotNull().first()
 			}
 
-			// Load preferences if needed
-			if (userSettingPreferences.shouldUpdate) {
-				userSettingPreferences.update()
-			}
-
-			// Get home sections from preferences
-			val homesections = userSettingPreferences.activeHomesections
+			if (userSettingPreferences.shouldUpdate) userSettingPreferences.update()
+			val homeSections = userSettingPreferences.activeHomesections
 			var includeLiveTvRows = false
 
-			// Check for live TV support
-			if (homesections.contains(HomeSectionType.LIVE_TV) && currentUser.policy?.enableLiveTvAccess == true) {
+			if (homeSections.contains(HomeSectionType.LIVE_TV) && currentUser.policy?.enableLiveTvAccess == true) {
 				val recommendedPrograms by api.liveTvApi.getRecommendedPrograms(
 					enableTotalRecordCount = false,
 					imageTypeLimit = 1,
@@ -165,65 +157,85 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 				includeLiveTvRows = recommendedPrograms.items.isNotEmpty()
 			}
 
-			// Build rows based on preferences
-			val rows = mutableListOf<HomeFragmentRow>()
-
-			// Check for coroutine cancellation
-			if (!isActive) return@launch
-
-			// Add sections based on preferences
-			for (section in homesections) when (section) {
-				HomeSectionType.LATEST_MEDIA -> rows.add(helper.loadRecentlyAdded(userViewsRepository.views.first()))
-				HomeSectionType.LIBRARY_TILES_SMALL -> rows.add(HomeFragmentViewsRow(small = false))
-				HomeSectionType.LIBRARY_BUTTONS -> rows.add(HomeFragmentViewsRow(small = true))
-				HomeSectionType.RESUME -> rows.add(helper.loadResumeVideo())
-				HomeSectionType.RESUME_AUDIO -> rows.add(helper.loadResumeAudio())
-				HomeSectionType.RESUME_BOOK -> Unit // Books are not (yet) supported
-				HomeSectionType.ACTIVE_RECORDINGS -> rows.add(helper.loadLatestLiveTvRecordings())
-				HomeSectionType.NEXT_UP -> rows.add(helper.loadNextUp())
-				HomeSectionType.LIVE_TV -> if (includeLiveTvRows) {
-					rows.add(liveTVRow)
-					rows.add(helper.loadOnNow())
-				}
-				HomeSectionType.RECOMMENDED_FOR_YOU -> rows.add(helper.loadRecommendedForYou(userViewsRepository.views.first()))
-				HomeSectionType.TRENDING_THIS_WEEK -> rows.add(helper.loadTrendingThisWeek(userViewsRepository.views.first()))
-				HomeSectionType.RECENTLY_RELEASED -> rows.add(helper.loadRecentlyReleased(userViewsRepository.views.first()))
-				HomeSectionType.POPULAR_MOVIES -> rows.add(helper.loadPopularMovies(userViewsRepository.views.first()))
-				HomeSectionType.POPULAR_TV -> rows.add(helper.loadPopularTV(userViewsRepository.views.first()))
-				HomeSectionType.SIMILAR_TO_WATCHED -> rows.add(helper.loadSimilarToWatched(userViewsRepository.views.first()))
-				HomeSectionType.GENRE_RANDOM_MOVIES -> rows.add(helper.loadGenreRandomMovies(userViewsRepository.views.first()))
-				HomeSectionType.GENRE_RANDOM_TV -> rows.add(helper.loadGenreRandomTV(userViewsRepository.views.first()))
-				HomeSectionType.GENRE_RANDOM_MIXED -> rows.add(helper.loadGenreRandomMixed(userViewsRepository.views.first()))
-
-				HomeSectionType.NONE -> Unit
-			}
-
-			// Add sections to layout
-			withContext(Dispatchers.Main) {
-				(adapter as MutableObjectAdapter<*>).clear()
-			}
-
-			val cardPresenter = CardPresenter(true, org.jellyfin.androidtv.constant.ImageType.POSTER, 120)
 			val rowsAdapter = adapter as MutableObjectAdapter<Row>
+			val cardPresenter = CardPresenter(true, org.jellyfin.androidtv.constant.ImageType.POSTER, 120)
 			val ctx = requireContext()
+			rowsAdapter.clear()
 
-			withContext(Dispatchers.Main) {
-				notificationsRow.addToRowsAdapter(ctx, cardPresenter, rowsAdapter)
-				nowPlaying.addToRowsAdapter(ctx, cardPresenter, rowsAdapter)
+			val recyclerView = view as? androidx.recyclerview.widget.RecyclerView
+
+			val readyRows: List<HomeFragmentRow> = coroutineScope {
+				homeSections.map { section ->
+					async(Dispatchers.IO) { loadRowForSection(section, includeLiveTvRows) }
+				}.mapNotNull { it.await() }
 			}
 
-			for (row in rows) {
-				if (!isActive) break
-				addRowSequentially(ctx, cardPresenter, rowsAdapter, row)
+			withContext(Dispatchers.Main) {
+				recyclerView?.suppressLayout(true)
+
+				for (row in readyRows) {
+					row.addToRowsAdapter(ctx, cardPresenter, rowsAdapter)
+				}
+
+				recyclerView?.suppressLayout(false)
+
+				recyclerView?.post {
+					val firstRow = (rowsAdapter.firstOrNull() as? ListRow)
+					val adapterFirstRow = firstRow?.adapter as? ItemRowAdapter
+					val firstItem = adapterFirstRow?.get(0) as? BaseRowItem
+					if (firstItem != null) {
+						backgroundService.setBackground(firstItem.baseItem)
+						homePreviewViewModel.updateSelectedItem(firstItem)
+					}
+				}
+			}
+
+			if (includeLiveTvRows) {
+				val onNowRow = withContext(Dispatchers.IO) { helper.loadOnNow() }
+				withContext(Dispatchers.Main) {
+					addRowSequentially(ctx, cardPresenter, rowsAdapter, onNowRow)
+				}
 			}
 		}
 	}
+
+	private suspend fun loadRowForSection(section: HomeSectionType, includeLiveTvRows: Boolean): HomeFragmentRow? {
+		return when (section) {
+			HomeSectionType.LATEST_MEDIA -> helper.loadRecentlyAdded(userViewsRepository.views.first())
+			HomeSectionType.LIBRARY_TILES_SMALL -> HomeFragmentViewsRow(small = false)
+			HomeSectionType.LIBRARY_BUTTONS -> HomeFragmentViewsRow(small = true)
+			HomeSectionType.RESUME -> helper.loadResumeVideo()
+			HomeSectionType.RESUME_AUDIO -> helper.loadResumeAudio()
+			HomeSectionType.ACTIVE_RECORDINGS -> helper.loadLatestLiveTvRecordings()
+			HomeSectionType.NEXT_UP -> helper.loadNextUp()
+			HomeSectionType.LIVE_TV -> if (includeLiveTvRows) liveTVRow else null
+			HomeSectionType.RECOMMENDED_FOR_YOU -> helper.loadRecommendedForYou(userViewsRepository.views.first())
+			HomeSectionType.TRENDING_THIS_WEEK -> helper.loadTrendingThisWeek(userViewsRepository.views.first())
+			HomeSectionType.RECENTLY_RELEASED -> helper.loadRecentlyReleased(userViewsRepository.views.first())
+			HomeSectionType.POPULAR_MOVIES -> helper.loadPopularMovies(userViewsRepository.views.first())
+			HomeSectionType.POPULAR_TV -> helper.loadPopularTV(userViewsRepository.views.first())
+			HomeSectionType.SIMILAR_TO_WATCHED -> helper.loadSimilarToWatched(userViewsRepository.views.first())
+			HomeSectionType.GENRE_RANDOM_MOVIES -> helper.loadGenreRandomMovies(userViewsRepository.views.first())
+			HomeSectionType.GENRE_RANDOM_TV -> helper.loadGenreRandomTV(userViewsRepository.views.first())
+			HomeSectionType.GENRE_RANDOM_MIXED -> helper.loadGenreRandomMixed(userViewsRepository.views.first())
+			else -> null
+		}
+	}
+
 
 	override fun onKey(v: View?, keyCode: Int, event: KeyEvent?): Boolean {
 		if (event?.action != KeyEvent.ACTION_UP) return false
 		return keyProcessor.handleKey(keyCode, currentItem, activity)
 	}
 
+	/**
+	 * Called when the fragment is resumed.
+	 *
+	 * Reacts to deletion by removing the current item from the row adapter
+	 * and clearing the last deleted item ID.
+	 * If not just loaded, refreshes the current item and updates the rows.
+	 * Also updates the audio queue.
+	 */
 	override fun onResume() {
 		super.onResume()
 

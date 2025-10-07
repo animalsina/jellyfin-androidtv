@@ -11,14 +11,14 @@ import android.widget.FrameLayout
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.core.content.res.ResourcesCompat
+import androidx.core.view.doOnAttach
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentContainerView
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.findViewTreeLifecycleOwner
 import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.findViewTreeLifecycleOwner
-import androidx.core.view.doOnAttach
-import androidx.core.view.isVisible
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -32,29 +32,29 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.jellyfin.androidtv.R
-import org.jellyfin.androidtv.ui.AsyncImageView
 import org.jellyfin.androidtv.auth.repository.ServerRepository
 import org.jellyfin.androidtv.auth.repository.SessionRepository
 import org.jellyfin.androidtv.auth.repository.UserRepository
 import org.jellyfin.androidtv.data.repository.NotificationsRepository
+import org.jellyfin.androidtv.data.repository.UserViewsRepository
+import org.jellyfin.androidtv.preference.UserPreferences
+import org.jellyfin.androidtv.ui.AsyncImageView
 import org.jellyfin.androidtv.ui.itemhandling.BaseRowItem
+import org.jellyfin.androidtv.ui.itemhandling.ItemLauncher
 import org.jellyfin.androidtv.ui.navigation.ActivityDestinations
 import org.jellyfin.androidtv.ui.navigation.Destinations
 import org.jellyfin.androidtv.ui.navigation.NavigationRepository
 import org.jellyfin.androidtv.ui.playback.MediaManager
 import org.jellyfin.androidtv.ui.startup.StartupActivity
 import org.jellyfin.androidtv.util.ImageHelper
-import org.jellyfin.androidtv.util.apiclient.itemImages
 import org.jellyfin.androidtv.util.apiclient.itemBackdropImages
+import org.jellyfin.androidtv.util.apiclient.itemImages
 import org.jellyfin.androidtv.util.apiclient.parentBackdropImages
 import org.jellyfin.androidtv.util.apiclient.seriesThumbImage
-import org.jellyfin.androidtv.data.repository.UserViewsRepository
-import org.jellyfin.androidtv.preference.UserPreferences
-import org.jellyfin.androidtv.ui.itemhandling.ItemLauncher
 import org.jellyfin.sdk.model.api.BaseItemDto
-import org.jellyfin.sdk.model.api.ImageType
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.CollectionType
+import org.jellyfin.sdk.model.api.ImageType
 import org.koin.android.ext.android.get
 import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.activityViewModel
@@ -62,6 +62,7 @@ import timber.log.Timber
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
+
 
 class HomeFragmentNetflixStyle : Fragment() {
 	private val sessionRepository by inject<SessionRepository>()
@@ -94,6 +95,10 @@ class HomeFragmentNetflixStyle : Fragment() {
 	private val trailerCache = mutableMapOf<String, String>()
 	private var trailerJob: Job? = null
 	private var trailerHideJob: Job? = null
+
+	companion object {
+		private val TRAILER_TYPES = setOf(BaseItemKind.SERIES, BaseItemKind.EPISODE, BaseItemKind.MOVIE, BaseItemKind.SEASON, BaseItemKind.VIDEO)
+	}
 
 	override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
 		val view = inflater.inflate(R.layout.fragment_home_netflix_style, container, false)
@@ -229,7 +234,9 @@ class HomeFragmentNetflixStyle : Fragment() {
 		previewPoster.visibility = View.GONE
 
 		if (isTrailerEnabled()) {
-			playYouTubeTrailerWithDelay(item)
+			if(TRAILER_TYPES.contains(item.baseItem.type)) {
+				playYouTubeTrailerWithDelay(item)
+			}
 		}
 	}
 
@@ -689,15 +696,12 @@ class HomeFragmentNetflixStyle : Fragment() {
 	}
 
 	private fun fetchTrailerFromYouTube(query: String, callback: (String) -> Unit) {
-		// lifecycleScope disponibile in Fragment/Activity
 		viewLifecycleOwner.lifecycleScope.launch {
 			try {
-				// Tutto il lavoro di rete nel contesto IO
 				val videoId = withContext(Dispatchers.IO) {
 					val encodedQuery = URLEncoder.encode(query, "UTF-8")
 					val searchUrl = "https://www.youtube.com/results?search_query=$encodedQuery"
 
-					// OkHttp per scaricare HTML
 					val client = OkHttpClient()
 					val request = Request.Builder()
 						.url(searchUrl)
@@ -707,16 +711,14 @@ class HomeFragmentNetflixStyle : Fragment() {
 					val res = client.newCall(request).execute()
 					val body = res.body?.string().orEmpty()
 
-					// Estrazione primo video ID
 					val regex = """/watch\?v=([a-zA-Z0-9_-]{11})""".toRegex()
 					regex.find(body)?.groups?.get(1)?.value.orEmpty()
 				}
 
-				// Controllo embeddabilità (funzione sincrona dentro IO)
 				if (!checkedAllowedYoutubeVideo("https://www.youtube.com/watch?v=$videoId")) {
 					throw Exception("Not allowed video")
 				}
-				// Callback sul main thread
+
 				callback(videoId)
 			} catch (e: Exception) {
 				Timber.e(e, "Failed to fetch YouTube trailer")

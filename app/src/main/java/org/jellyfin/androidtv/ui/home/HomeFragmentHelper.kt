@@ -1,6 +1,8 @@
 package org.jellyfin.androidtv.ui.home
 
 import android.content.Context
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.auth.repository.UserRepository
 import org.jellyfin.androidtv.constant.ChangeTriggerType
@@ -18,9 +20,10 @@ class HomeFragmentHelper(
 	private val context: Context,
 	private val userRepository: UserRepository,
 ) {
-	fun loadRecentlyAdded(userViews: Collection<BaseItemDto>): HomeFragmentRow {
-		return HomeFragmentLatestRow(userRepository, userViews)
-	}
+	suspend fun loadRecentlyAdded(userViews: Collection<BaseItemDto>): HomeFragmentRow =
+		withContext(Dispatchers.IO) {
+			HomeFragmentLatestRow(userRepository, userViews)
+		}
 
 	fun loadResume(title: String, includeMediaTypes: Collection<MediaType>): HomeFragmentRow {
 		val query = GetResumeItemsRequest(
@@ -35,7 +38,7 @@ class HomeFragmentHelper(
 		return HomeFragmentBrowseRowDefRow(BrowseRowDef(title, query, 0, false, true, arrayOf(ChangeTriggerType.TvPlayback, ChangeTriggerType.MoviePlayback)))
 	}
 
-	fun loadResumeVideo(): HomeFragmentRow {
+	suspend fun loadResumeVideo(): HomeFragmentRow = withContext(Dispatchers.IO) {
 		val query = GetResumeItemsRequest(
 			limit = ITEM_LIMIT_RESUME,
 			fields = ItemRepository.itemFields,
@@ -44,13 +47,23 @@ class HomeFragmentHelper(
 			mediaTypes = listOf(MediaType.VIDEO),
 			excludeItemTypes = setOf(BaseItemKind.AUDIO_BOOK),
 		)
-
-		return ContinueWatchingHomeFragmentRow(BrowseRowDef(context.getString(R.string.lbl_continue_watching), query, 0, false, true, arrayOf(ChangeTriggerType.TvPlayback, ChangeTriggerType.MoviePlayback)))
+		ContinueWatchingHomeFragmentRow(
+			BrowseRowDef(
+				context.getString(R.string.lbl_continue_watching),
+				query, 0, false, true,
+				arrayOf(ChangeTriggerType.TvPlayback, ChangeTriggerType.MoviePlayback)
+			)
+		)
 	}
 
-	fun loadResumeAudio(): HomeFragmentRow {
-		return loadResume(context.getString(R.string.continue_listening), listOf(MediaType.AUDIO))
-	}
+	/**
+	 * Returns a HomeFragmentRow for resuming audio playback.
+	 * This will load resume items for audio media types.
+	 *
+	 * @return a HomeFragmentRow for resuming audio playback
+	 */
+	fun loadResumeAudio(): HomeFragmentRow =
+		loadResume(context.getString(R.string.continue_listening), listOf(MediaType.AUDIO))
 
 	fun loadLatestLiveTvRecordings(): HomeFragmentRow {
 		val query = GetRecordingsRequest(
@@ -86,41 +99,51 @@ class HomeFragmentHelper(
 	}
 
 	// New row loader methods for Netflix-style rows
-	fun loadRecommendedForYou(userViews: Collection<BaseItemDto>): HomeFragmentRow {
-		return HomeFragmentRecommendedRow.createRecommendedForYouRow(context, userViews)
-	}
+	suspend fun loadRecommendedForYou(userViews: Collection<BaseItemDto>): HomeFragmentRow =
+		withContext(Dispatchers.IO) {
+			HomeFragmentRecommendedRow.createRecommendedForYouRow(context, userViews)
+		}
 
-	fun loadTrendingThisWeek(userViews: Collection<BaseItemDto>): HomeFragmentRow {
-		return HomeFragmentPopularRow.createTrendingRow(context, userViews)
-	}
+	suspend fun loadTrendingThisWeek(userViews: Collection<BaseItemDto>): HomeFragmentRow =
+		withContext(Dispatchers.IO) {
+			HomeFragmentPopularRow.createTrendingRow(context, userViews)
+		}
 
-	fun loadRecentlyReleased(userViews: Collection<BaseItemDto>): HomeFragmentRow {
-		return HomeFragmentPopularRow.createRecentlyReleasedRow(context, userViews)
-	}
+	suspend fun loadRecentlyReleased(userViews: Collection<BaseItemDto>): HomeFragmentRow =
+		withContext(Dispatchers.IO) {
+			HomeFragmentPopularRow.createRecentlyReleasedRow(context, userViews)
+		}
 
-	fun loadPopularMovies(userViews: Collection<BaseItemDto>): HomeFragmentRow {
-		return HomeFragmentPopularRow.createPopularMoviesRow(context, userViews)
-	}
+	suspend fun loadPopularMovies(userViews: Collection<BaseItemDto>): HomeFragmentRow =
+		withContext(Dispatchers.IO) {
+			HomeFragmentPopularRow.createPopularMoviesRow(context, userViews)
+		}
 
-	fun loadPopularTV(userViews: Collection<BaseItemDto>): HomeFragmentRow {
-		return HomeFragmentPopularRow.createPopularTVRow(context, userViews)
-	}
+	suspend fun loadPopularTV(userViews: Collection<BaseItemDto>): HomeFragmentRow =
+		withContext(Dispatchers.IO) {
+			HomeFragmentPopularRow.createPopularTVRow(context, userViews)
+		}
 
-	fun loadSimilarToWatched(userViews: Collection<BaseItemDto>): HomeFragmentRow {
-		return HomeFragmentSimilarToWatchedRow.create(context, userViews)
-	}
+	suspend fun loadSimilarToWatched(userViews: Collection<BaseItemDto>): HomeFragmentRow =
+		withContext(Dispatchers.IO) {
+			HomeFragmentSimilarToWatchedRow.create(context, userViews)
+		}
 
-	fun loadGenreRandomMovies(userViews: Collection<BaseItemDto>): HomeFragmentRow {
-		return HomeFragmentGenreRow.createMovieGenreRow(userViews)
-	}
+	suspend fun loadGenreRandomMovies(userViews: Collection<BaseItemDto>): HomeFragmentRow =
+		withContext(Dispatchers.IO) {
+			HomeFragmentGenreRow.createMovieGenreRow(userViews)
+		}
 
-	fun loadGenreRandomTV(userViews: Collection<BaseItemDto>): HomeFragmentRow {
-		return HomeFragmentGenreRow.createTVGenreRow(userViews)
-	}
+	suspend fun loadGenreRandomTV(userViews: Collection<BaseItemDto>): HomeFragmentRow =
+		withContext(Dispatchers.IO) {
+			HomeFragmentGenreRow.createTVGenreRow(userViews)
+		}
 
-	fun loadGenreRandomMixed(userViews: Collection<BaseItemDto>): HomeFragmentRow {
-		return HomeFragmentGenreRow.createMixedGenreRow(userViews)
-	}
+	suspend fun loadGenreRandomMixed(userViews: Collection<BaseItemDto>): HomeFragmentRow =
+		withContext(Dispatchers.IO) {
+			HomeFragmentGenreRow.createMixedGenreRow(userViews)
+		}
+
 
 	companion object {
 		// Maximum amount of items loaded for a row
