@@ -1,5 +1,6 @@
 package org.jellyfin.androidtv.ui.playback;
 
+import static org.koin.java.KoinJavaComponent.get;
 import static org.koin.java.KoinJavaComponent.inject;
 
 import android.annotation.TargetApi;
@@ -32,6 +33,7 @@ import org.jellyfin.androidtv.util.apiclient.Response;
 import org.jellyfin.androidtv.util.profile.DeviceProfileKt;
 import org.jellyfin.androidtv.util.sdk.compat.JavaCompat;
 import org.jellyfin.sdk.api.client.ApiClient;
+import org.jellyfin.sdk.model.ServerVersion;
 import org.jellyfin.sdk.model.api.BaseItemDto;
 import org.jellyfin.sdk.model.api.BaseItemKind;
 import org.jellyfin.sdk.model.api.DeviceProfile;
@@ -505,8 +507,8 @@ public class PlaybackController implements PlaybackControllerNotifiable {
         VideoOptions internalOptions = new VideoOptions();
         internalOptions.setItemId(item.getId());
         internalOptions.setMediaSources(item.getMediaSources());
-        if (playbackRetries > 0 || (isLiveTv && !directStreamLiveTv)) internalOptions.setEnableDirectStream(false);
-        if (playbackRetries > 1) internalOptions.setEnableDirectPlay(false);
+        if (playbackRetries > 0 || (isLiveTv && !directStreamLiveTv)) internalOptions.setEnableDirectPlay(false);
+        if (playbackRetries > 1) internalOptions.setEnableDirectStream(false);
         if (mCurrentOptions != null) {
             internalOptions.setSubtitleStreamIndex(mCurrentOptions.getSubtitleStreamIndex());
             internalOptions.setAudioStreamIndex(mCurrentOptions.getAudioStreamIndex());
@@ -528,8 +530,9 @@ public class PlaybackController implements PlaybackControllerNotifiable {
             internalOptions.setMediaSourceId(currentMediaSource.getId());
         }
         DeviceProfile internalProfile = DeviceProfileKt.createDeviceProfile(
+                mFragment.getContext(),
                 userPreferences.getValue(),
-                !internalOptions.getEnableDirectStream()
+                get(ServerVersion.class)
         );
         internalOptions.setProfile(internalProfile);
         return internalOptions;
@@ -1203,6 +1206,8 @@ public class PlaybackController implements PlaybackControllerNotifiable {
                 Integer currentSubtitleIndex = mCurrentOptions.getSubtitleStreamIndex();
                 if (currentSubtitleIndex == null) currentSubtitleIndex = -1;
                 PlaybackControllerHelperKt.setSubtitleIndex(this, currentSubtitleIndex, true);
+            } else {
+                PlaybackControllerHelperKt.disableDefaultSubtitles(this);
             }
 
             // select an audio track

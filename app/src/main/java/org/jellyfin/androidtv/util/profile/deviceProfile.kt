@@ -1,15 +1,18 @@
 package org.jellyfin.androidtv.util.profile
 
+import android.content.Context
 import androidx.media3.common.MimeTypes
 import org.jellyfin.androidtv.constant.Codec
 import org.jellyfin.androidtv.preference.UserPreferences
 import org.jellyfin.androidtv.preference.constant.AudioBehavior
+import org.jellyfin.sdk.model.ServerVersion
 import org.jellyfin.sdk.model.api.CodecType
 import org.jellyfin.sdk.model.api.DlnaProfileType
 import org.jellyfin.sdk.model.api.EncodingContext
 import org.jellyfin.sdk.model.api.MediaStreamProtocol
 import org.jellyfin.sdk.model.api.ProfileConditionValue
 import org.jellyfin.sdk.model.api.SubtitleDeliveryMethod
+import org.jellyfin.sdk.model.api.VideoRangeType
 import org.jellyfin.sdk.model.deviceprofile.DeviceProfileBuilder
 import org.jellyfin.sdk.model.deviceprofile.buildDeviceProfile
 
@@ -51,22 +54,28 @@ private fun UserPreferences.getMaxBitrate(): Int {
 	return maxBitrate * 1_000_000
 }
 
-fun createDeviceProfile(userPreferences: UserPreferences, disableDirectPlay: Boolean) = createDeviceProfile(
+fun createDeviceProfile(
+	context: Context,
+	userPreferences: UserPreferences,
+	serverVersion: ServerVersion,
+) = createDeviceProfile(
+	mediaTest = MediaCodecCapabilitiesTest(context),
 	maxBitrate = userPreferences.getMaxBitrate(),
-	disableDirectPlay = disableDirectPlay,
 	isAC3Enabled = userPreferences[UserPreferences.ac3Enabled],
 	downMixAudio = userPreferences[UserPreferences.audioBehaviour] == AudioBehavior.DOWNMIX_TO_STEREO,
 	assDirectPlay = userPreferences[UserPreferences.assDirectPlay],
 	pgsDirectPlay = userPreferences[UserPreferences.pgsDirectPlay],
+	jellyfinTenEleven = serverVersion >= ServerVersion(10, 11, 0),
 )
 
 fun createDeviceProfile(
+	mediaTest: MediaCodecCapabilitiesTest,
 	maxBitrate: Int,
-	disableDirectPlay: Boolean,
 	isAC3Enabled: Boolean,
 	downMixAudio: Boolean,
 	assDirectPlay: Boolean,
 	pgsDirectPlay: Boolean,
+	jellyfinTenEleven: Boolean,
 ) = buildDeviceProfile {
 	val allowedAudioCodecs = when {
 		downMixAudio -> downmixSupportedAudioCodecs
@@ -74,7 +83,6 @@ fun createDeviceProfile(
 		else -> supportedAudioCodecs
 	}
 
-	val mediaTest = MediaCodecCapabilitiesTest()
 	val supportsHevc = mediaTest.supportsHevc()
 	val supportsHevcMain10 = mediaTest.supportsHevcMain10()
 	val hevcMainLevel = mediaTest.getHevcMainLevel()
@@ -88,6 +96,24 @@ fun createDeviceProfile(
 	val maxResolutionAVC = mediaTest.getMaxResolution(MimeTypes.VIDEO_H264)
 	val maxResolutionHevc = mediaTest.getMaxResolution(MimeTypes.VIDEO_H265)
 	val maxResolutionAV1 = mediaTest.getMaxResolution(MimeTypes.VIDEO_AV1)
+
+	/// HDR capabilities
+	// Display
+	val supportsDolbyVisionDisplay = mediaTest.supportsDolbyVision()
+	val supportsHdr10Display = mediaTest.supportsHdr10()
+	val supportsHdr10PlusDisplay = mediaTest.supportsHdr10Plus()
+
+	// Codecs
+	// AV1
+	val supportsAV1DolbyVision = mediaTest.supportsAV1DolbyVision()
+	val supportsAV1HDR10 = mediaTest.supportsAV1HDR10()
+	val supportsAV1HDR10Plus = mediaTest.supportsAV1HDR10Plus()
+
+	// HEVC
+	val supportsHevcDolbyVision = mediaTest.supportsHevcDolbyVision()
+	val supportsHevcDolbyVisionEL = mediaTest.supportsHevcDolbyVisionEL()
+	val supportsHevcHDR10 = mediaTest.supportsHevcHDR10()
+	val supportsHevcHDR10Plus = mediaTest.supportsHevcHDR10Plus()
 
 	name = "AndroidTV-Default"
 
@@ -124,46 +150,44 @@ fun createDeviceProfile(
 	}
 
 	/// Direct play profiles
-	if (!disableDirectPlay) {
-		// Video
-		directPlayProfile {
-			type = DlnaProfileType.VIDEO
+	// Video
+	directPlayProfile {
+		type = DlnaProfileType.VIDEO
 
-			container(
-				Codec.Container.ASF,
-				Codec.Container.HLS,
-				Codec.Container.M4V,
-				Codec.Container.MKV,
-				Codec.Container.MOV,
-				Codec.Container.MP4,
-				Codec.Container.OGM,
-				Codec.Container.OGV,
-				Codec.Container.TS,
-				Codec.Container.VOB,
-				Codec.Container.WEBM,
-				Codec.Container.WMV,
-				Codec.Container.XVID,
-			)
+		container(
+			Codec.Container.ASF,
+			Codec.Container.HLS,
+			Codec.Container.M4V,
+			Codec.Container.MKV,
+			Codec.Container.MOV,
+			Codec.Container.MP4,
+			Codec.Container.OGM,
+			Codec.Container.OGV,
+			Codec.Container.TS,
+			Codec.Container.VOB,
+			Codec.Container.WEBM,
+			Codec.Container.WMV,
+			Codec.Container.XVID,
+		)
 
-			videoCodec(
-				Codec.Video.AV1,
-				Codec.Video.H264,
-				Codec.Video.HEVC,
-				Codec.Video.MPEG,
-				Codec.Video.MPEG2VIDEO,
-				Codec.Video.VP8,
-				Codec.Video.VP9,
-			)
+		videoCodec(
+			Codec.Video.AV1,
+			Codec.Video.H264,
+			Codec.Video.HEVC,
+			Codec.Video.MPEG,
+			Codec.Video.MPEG2VIDEO,
+			Codec.Video.VP8,
+			Codec.Video.VP9,
+		)
 
-			audioCodec(*allowedAudioCodecs)
-		}
+		audioCodec(*allowedAudioCodecs)
+	}
 
-		// Audio
-		directPlayProfile {
-			type = DlnaProfileType.AUDIO
+	// Audio
+	directPlayProfile {
+		type = DlnaProfileType.AUDIO
 
-			audioCodec(*allowedAudioCodecs)
-		}
+		audioCodec(*allowedAudioCodecs)
 	}
 
 	/// Codec profiles
@@ -337,6 +361,96 @@ fun createDeviceProfile(
 			ProfileConditionValue.WIDTH lowerThanOrEquals maxResolutionAV1.width
 			ProfileConditionValue.HEIGHT lowerThanOrEquals maxResolutionAV1.height
 		}
+	}
+
+	/// HDR exclude list
+	// TODO Use VideoRangeType enum with Jelylfin 10.11 based SDK
+	// Display
+	codecProfile {
+		type = CodecType.VIDEO
+
+		conditions {
+			if (!supportsDolbyVisionDisplay) {
+				ProfileConditionValue.VIDEO_RANGE_TYPE notEquals VideoRangeType.DOVI.serialName
+				if (jellyfinTenEleven) {
+					ProfileConditionValue.VIDEO_RANGE_TYPE notEquals "DOVIWithEL"
+					if (!supportsHdr10PlusDisplay) {
+						ProfileConditionValue.VIDEO_RANGE_TYPE notEquals "DOVIWithHDR10Plus"
+						ProfileConditionValue.VIDEO_RANGE_TYPE notEquals "DOVIWithELHDR10Plus"
+					}
+				}
+				if (!supportsHdr10Display)
+					ProfileConditionValue.VIDEO_RANGE_TYPE notEquals VideoRangeType.DOVI_WITH_HDR10.serialName
+			}
+			if (!supportsHdr10PlusDisplay) {
+				ProfileConditionValue.VIDEO_RANGE_TYPE notEquals VideoRangeType.HDR10_PLUS.serialName
+				if (!supportsHdr10Display)
+					ProfileConditionValue.VIDEO_RANGE_TYPE notEquals VideoRangeType.HDR10.serialName
+			}
+		}
+	}.let {
+		// Remove codec profile if all HDR types are fully supported
+		if (it.conditions.isEmpty()) codecProfiles.remove(it)
+	}
+
+	// Codecs
+	// AV1
+	codecProfile {
+		type = CodecType.VIDEO
+		codec = Codec.Video.AV1
+
+		conditions {
+			if (supportsDolbyVisionDisplay && !supportsAV1DolbyVision) {
+				ProfileConditionValue.VIDEO_RANGE_TYPE notEquals VideoRangeType.DOVI.serialName
+				if (supportsHdr10Display && !supportsAV1HDR10)
+					ProfileConditionValue.VIDEO_RANGE_TYPE notEquals VideoRangeType.DOVI_WITH_HDR10.serialName
+				if (jellyfinTenEleven && supportsHdr10PlusDisplay && !supportsAV1HDR10Plus)
+					ProfileConditionValue.VIDEO_RANGE_TYPE notEquals "DOVIWithHDR10Plus"
+			}
+			if (supportsHdr10PlusDisplay && !mediaTest.supportsAV1HDR10Plus()) {
+				ProfileConditionValue.VIDEO_RANGE_TYPE notEquals VideoRangeType.HDR10_PLUS.serialName
+				if (supportsHdr10Display && !mediaTest.supportsAV1HDR10())
+					ProfileConditionValue.VIDEO_RANGE_TYPE notEquals VideoRangeType.HDR10.serialName
+			}
+		}
+	}.let {
+		// Remove codec profile if all HDR types are fully supported
+		if (it.conditions.isEmpty()) codecProfiles.remove(it)
+	}
+
+	// HEVC
+	codecProfile {
+		type = CodecType.VIDEO
+		codec = Codec.Video.HEVC
+
+		conditions {
+			if (supportsDolbyVisionDisplay && !supportsHevcDolbyVisionEL) {
+				if (jellyfinTenEleven) {
+					ProfileConditionValue.VIDEO_RANGE_TYPE notEquals "DOVIWithEL"
+					if (supportsHdr10PlusDisplay && !supportsHevcHDR10Plus && !KnownDefects.hevcDoviHdr10PlusBug)
+						ProfileConditionValue.VIDEO_RANGE_TYPE notEquals "DOVIWithELHDR10Plus"
+				}
+				if (!supportsHevcDolbyVision) {
+					ProfileConditionValue.VIDEO_RANGE_TYPE notEquals VideoRangeType.DOVI.serialName
+					if (supportsHdr10Display && !supportsHevcHDR10)
+						ProfileConditionValue.VIDEO_RANGE_TYPE notEquals VideoRangeType.DOVI_WITH_HDR10.serialName
+					if (jellyfinTenEleven && supportsHdr10PlusDisplay && !supportsHevcHDR10Plus && !KnownDefects.hevcDoviHdr10PlusBug)
+						ProfileConditionValue.VIDEO_RANGE_TYPE notEquals "DOVIWithHDR10Plus"
+				}
+			}
+			if (supportsHdr10PlusDisplay && !supportsHevcHDR10Plus) {
+				ProfileConditionValue.VIDEO_RANGE_TYPE notEquals VideoRangeType.HDR10_PLUS.serialName
+				if (supportsHdr10Display && !supportsHevcHDR10)
+					ProfileConditionValue.VIDEO_RANGE_TYPE notEquals VideoRangeType.HDR10.serialName
+			}
+			if (jellyfinTenEleven && KnownDefects.hevcDoviHdr10PlusBug && (supportsHdr10PlusDisplay || supportsDolbyVisionDisplay)) {
+				ProfileConditionValue.VIDEO_RANGE_TYPE notEquals "DOVIWithHDR10Plus"
+				ProfileConditionValue.VIDEO_RANGE_TYPE notEquals "DOVIWithELHDR10Plus"
+			}
+		}
+	}.let {
+		// Remove codec profile if all HDR types are fully supported
+		if (it.conditions.isEmpty()) codecProfiles.remove(it)
 	}
 
 	// Audio channel profile
