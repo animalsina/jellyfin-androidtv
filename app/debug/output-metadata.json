@@ -11,9 +11,9 @@
       "type": "SINGLE",
       "filters": [],
       "attributes": [],
-      "versionCode": 2,
-      "versionName": "0.0.0-dev.2",
-      "outputFile": "jellyfin-androidtv-v0.0.0-dev.2-debug.apk"
+      "versionCode": 1000099,
+      "versionName": "1.0.0",
+      "outputFile": "jellyfin-androidtv-v1.0.0-debug.apk"
     }
   ],
   "elementType": "File",
