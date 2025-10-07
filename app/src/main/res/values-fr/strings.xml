@@ -60,7 +60,7 @@
     <string name="msg_video_playback_error">"Erreur de lecture de la vidéo - "</string>
     <string name="lbl_bracket_unknown">Inconnu</string>
     <string name="lbl_trailer">"Bande-annonce "</string>
-    <string name="lbl_play_trailers">Lire les bandes-annonces</string>
+    <string name="lbl_play_trailers">Bande-annonce</string>
     <string name="lbl_no">Non</string>
     <string name="lbl_yes">Oui</string>
     <string name="lbl_enter_server_address">Saisir l\'adresse du serveur</string>
@@ -599,4 +599,5 @@
     <string name="lbl_still_watching_long">5 épisodes ou 150 minutes</string>
     <string name="lbl_still_watching_very_long">8 épisodes ou 240 minutes</string>
     <string name="still_watching_label">Tu regardes toujours ?</string>
+    <string name="pref_subtitles_position">Décalage par rapport au bas</string>
 </resources>

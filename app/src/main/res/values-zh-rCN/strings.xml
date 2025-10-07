@@ -110,7 +110,7 @@
     <string name="lbl_show_indicators">显示指标</string>
     <string name="lbl_sort_by">排序</string>
     <string name="lbl_premiere">首映</string>
-    <string name="lbl_guest_stars">访客评分</string>
+    <string name="lbl_guest_stars">客串明星</string>
     <string name="lbl_on_schedule">在计划上</string>
     <string name="lbl_at_any_time">随时</string>
     <string name="lbl_series_recordings">节目录制</string>
@@ -579,4 +579,5 @@
     <string name="lbl_still_watching_long">5集或150分钟</string>
     <string name="lbl_still_watching_very_long">8集或240分钟</string>
     <string name="still_watching_label">你还在看吗？</string>
+    <string name="pref_subtitles_position">从底部偏移</string>
 </resources>
