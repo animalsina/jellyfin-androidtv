@@ -17,7 +17,7 @@ import org.jellyfin.sdk.model.api.request.GetItemsRequest
 
 class HomeFragmentSimilarToWatchedRow(
 	private val userViews: Collection<BaseItemDto>,
-	private val title: String = "More Like This"
+	private val titleId: Int = R.string.home_section_similar_to_watched
 ) : HomeFragmentRow {
 
 	override fun addToRowsAdapter(context: Context, cardPresenter: CardPresenter, rowsAdapter: MutableObjectAdapter<Row>) {
@@ -26,7 +26,7 @@ class HomeFragmentSimilarToWatchedRow(
 
 		// Create and add the row with static height for consistent sizing
 		val row = HomeFragmentBrowseRowDefRow(
-			BrowseRowDef(title, request, 50, false, true)
+			BrowseRowDef(context.getString(titleId), request, 50, false, true)
 		)
 		row.addToRowsAdapter(context, cardPresenter, rowsAdapter)
 	}
@@ -70,7 +70,7 @@ class HomeFragmentSimilarToWatchedRow(
 		// Factory method
 		fun create(context: Context, userViews: Collection<BaseItemDto>) = HomeFragmentSimilarToWatchedRow(
 			userViews = userViews,
-			title = context.getString(R.string.home_section_similar_to_watched)
+			titleId = R.string.home_section_similar_to_watched
 		)
 	}
 }

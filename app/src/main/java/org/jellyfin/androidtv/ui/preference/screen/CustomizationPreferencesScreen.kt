@@ -70,6 +70,12 @@ class CustomizationPreferencesScreen : OptionsFragment() {
 				setContent(R.string.pref_enable_media_management_description)
 				bind(userPreferences, UserPreferences.mediaManagementEnabled)
 			}
+
+			checkbox {
+				setTitle(R.string.pref_enable_trailer)
+				setContent(R.string.pref_enable_trailer_description)
+				bind(userPreferences, UserPreferences.trailerEnabled)
+			}
 		}
 
 		category {

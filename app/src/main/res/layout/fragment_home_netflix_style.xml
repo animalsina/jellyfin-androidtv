@@ -22,6 +22,22 @@
         android:visibility="gone"
         app:crossfadeDuration="0" />
 
+
+    <!-- Trailer Container (WebView) -->
+    <FrameLayout
+        android:id="@+id/trailer_container"
+        android:layout_width="600dp"
+        android:layout_height="450dp"
+        android:layout_alignParentEnd="true"
+        android:layout_alignParentTop="true"
+        android:visibility="gone">
+
+        <WebView
+            android:id="@+id/trailer_webview"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+    </FrameLayout>
+
     <!-- Gradient overlay to fade the image edges -->
     <View
         android:id="@+id/preview_gradient"
@@ -91,6 +107,17 @@
                     android:maxLines="2"
                     android:ellipsize="end"
                     android:layout_marginTop="8dp" />
+
+                <!-- Subtitle -->
+                <TextView
+                    android:id="@+id/preview_subtitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="14sp"
+                    android:textColor="@color/white"
+                    android:visibility="gone"
+                    android:ellipsize="end"
+                    android:singleLine="true"/>
 
                 <!-- Metadata (Year, Duration, Rating, etc) -->
                 <LinearLayout
