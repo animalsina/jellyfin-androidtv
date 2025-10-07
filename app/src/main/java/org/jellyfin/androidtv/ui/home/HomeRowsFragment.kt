@@ -17,6 +17,8 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import org.koin.androidx.viewmodel.ext.android.activityViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
@@ -111,7 +113,13 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 
 		lifecycleScope.launch {
 			lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-				api.webSocket.subscribe<UserDataChangedMessage>().onEach { refreshRows(force = true, delayed = false) }.launchIn(this)
+				try {
+					api.webSocket.subscribe<UserDataChangedMessage>()
+						.onEach { refreshRows(force = true, delayed = false) }
+						.launchIn(this)
+				} catch (e: Exception) {
+					Timber.e(e, "WebSocket subscription failed")
+				}
 
 				api.webSocket.subscribe<LibraryChangedMessage>().onEach { refreshRows(force = true, delayed = false) }.launchIn(this)
 			}
@@ -136,10 +144,10 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 			}
 
 			if (userSettingPreferences.shouldUpdate) userSettingPreferences.update()
-			val homesections = userSettingPreferences.activeHomesections
+			val homeSections = userSettingPreferences.activeHomesections
 			var includeLiveTvRows = false
 
-			if (homesections.contains(HomeSectionType.LIVE_TV) && currentUser.policy?.enableLiveTvAccess == true) {
+			if (homeSections.contains(HomeSectionType.LIVE_TV) && currentUser.policy?.enableLiveTvAccess == true) {
 				val recommendedPrograms by api.liveTvApi.getRecommendedPrograms(
 					enableTotalRecordCount = false,
 					imageTypeLimit = 1,
@@ -156,10 +164,10 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 
 			val recyclerView = view as? androidx.recyclerview.widget.RecyclerView
 
-			val readyRows = withContext(Dispatchers.IO) {
-				homesections.mapNotNull { section ->
-					loadRowForSection(section, includeLiveTvRows)
-				}
+			val readyRows: List<HomeFragmentRow> = coroutineScope {
+				homeSections.map { section ->
+					async(Dispatchers.IO) { loadRowForSection(section, includeLiveTvRows) }
+				}.mapNotNull { it.await() }
 			}
 
 			withContext(Dispatchers.Main) {
@@ -172,7 +180,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 				recyclerView?.suppressLayout(false)
 
 				recyclerView?.post {
-					val firstRow = (rowsAdapter[0] as? ListRow)
+					val firstRow = (rowsAdapter.firstOrNull() as? ListRow)
 					val adapterFirstRow = firstRow?.adapter as? ItemRowAdapter
 					val firstItem = adapterFirstRow?.get(0) as? BaseRowItem
 					if (firstItem != null) {

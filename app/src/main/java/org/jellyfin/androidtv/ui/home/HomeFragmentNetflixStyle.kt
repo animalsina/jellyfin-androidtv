@@ -696,15 +696,12 @@ class HomeFragmentNetflixStyle : Fragment() {
 	}
 
 	private fun fetchTrailerFromYouTube(query: String, callback: (String) -> Unit) {
-		// lifecycleScope disponibile in Fragment/Activity
 		viewLifecycleOwner.lifecycleScope.launch {
 			try {
-				// Tutto il lavoro di rete nel contesto IO
 				val videoId = withContext(Dispatchers.IO) {
 					val encodedQuery = URLEncoder.encode(query, "UTF-8")
 					val searchUrl = "https://www.youtube.com/results?search_query=$encodedQuery"
 
-					// OkHttp per scaricare HTML
 					val client = OkHttpClient()
 					val request = Request.Builder()
 						.url(searchUrl)
@@ -714,16 +711,14 @@ class HomeFragmentNetflixStyle : Fragment() {
 					val res = client.newCall(request).execute()
 					val body = res.body?.string().orEmpty()
 
-					// Estrazione primo video ID
 					val regex = """/watch\?v=([a-zA-Z0-9_-]{11})""".toRegex()
 					regex.find(body)?.groups?.get(1)?.value.orEmpty()
 				}
 
-				// Controllo embeddabilità (funzione sincrona dentro IO)
 				if (!checkedAllowedYoutubeVideo("https://www.youtube.com/watch?v=$videoId")) {
 					throw Exception("Not allowed video")
 				}
-				// Callback sul main thread
+
 				callback(videoId)
 			} catch (e: Exception) {
 				Timber.e(e, "Failed to fetch YouTube trailer")

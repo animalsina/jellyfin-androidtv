@@ -64,8 +64,19 @@ public class CardPresenter extends Presenter {
 
     private static final Map<BaseItemKind, Drawable> DEFAULT_IMAGES_CACHE = new HashMap<>();
 
+    static {
+        DEFAULT_IMAGES_CACHE.put(BaseItemKind.AUDIO, null);
+        DEFAULT_IMAGES_CACHE.put(BaseItemKind.MUSIC_ALBUM, null);
+        DEFAULT_IMAGES_CACHE.put(BaseItemKind.PERSON, null);
+        DEFAULT_IMAGES_CACHE.put(BaseItemKind.MUSIC_ARTIST, null);
+        DEFAULT_IMAGES_CACHE.put(BaseItemKind.SEASON, null);
+        DEFAULT_IMAGES_CACHE.put(BaseItemKind.SERIES, null);
+        DEFAULT_IMAGES_CACHE.put(BaseItemKind.EPISODE, null);
+        DEFAULT_IMAGES_CACHE.put(BaseItemKind.MOVIE, null);
+        DEFAULT_IMAGES_CACHE.put(BaseItemKind.VIDEO, null);
+    }
     private static void initDefaultImages(Context context) {
-        if (!DEFAULT_IMAGES_CACHE.isEmpty()) return; // già inizializzato
+        if (!DEFAULT_IMAGES_CACHE.isEmpty()) return;
 
         DEFAULT_IMAGES_CACHE.put(BaseItemKind.AUDIO, ContextCompat.getDrawable(context, R.drawable.tile_audio));
         DEFAULT_IMAGES_CACHE.put(BaseItemKind.MUSIC_ALBUM, ContextCompat.getDrawable(context, R.drawable.tile_audio));
@@ -98,14 +109,6 @@ public class CardPresenter extends Presenter {
             mCardView.addView(trailerContainer);
         }
 
-        public int getCardWidth() {
-            return cardWidth;
-        }
-
-        public int getCardHeight() {
-            return cardHeight;
-        }
-
         public void setItem(BaseRowItem m) {
             setItem(m, ImageType.POSTER, mStaticHeight, mStaticHeight, mStaticHeight);
         }
@@ -123,44 +126,27 @@ public class CardPresenter extends Presenter {
                 else if (itemDto != null) aspect = imageHelper.getValue().getImageAspectRatio(itemDto, m.getPreferParentThumb());
                 else aspect = 1.0;
 
+                mDefaultCardImage = getDefaultImage(mCardView.getContext(), itemDto.getType());
+
                 switch (itemDto.getType()) {
                     case AUDIO:
                     case MUSIC_ALBUM:
-                        mDefaultCardImage = DEFAULT_IMAGES_CACHE.getOrDefault(itemDto.getType(),
-                                ContextCompat.getDrawable(mCardView.getContext(), R.drawable.tile_audio));
-                        if (isUniformAspect || aspect < .8) aspect = 1.0;
-                        showWatched = false;
-                        break;
                     case PERSON:
                     case MUSIC_ARTIST:
-                        mDefaultCardImage = DEFAULT_IMAGES_CACHE.getOrDefault(itemDto.getType(),
-                                ContextCompat.getDrawable(mCardView.getContext(), R.drawable.tile_port_person));
                         if (isUniformAspect || aspect < .8) aspect = 1.0;
                         showWatched = false;
                         break;
-                    case SEASON:
-                    case SERIES:
-                        mDefaultCardImage = DEFAULT_IMAGES_CACHE.getOrDefault(itemDto.getType(),
-                                ContextCompat.getDrawable(mCardView.getContext(), R.drawable.tile_port_tv));
-                        if (imageType.equals(ImageType.POSTER)) aspect = ImageHelper.ASPECT_RATIO_2_3;
-                        break;
                     case EPISODE:
-                        mDefaultCardImage = DEFAULT_IMAGES_CACHE.getOrDefault(itemDto.getType(),
-                                ContextCompat.getDrawable(mCardView.getContext(), R.drawable.tile_land_tv));
                         aspect = ImageHelper.ASPECT_RATIO_16_9;
                         showProgress = true;
                         mCardView.setCardType(BaseCardView.CARD_TYPE_INFO_UNDER);
                         break;
                     case MOVIE:
                     case VIDEO:
-                        mDefaultCardImage = DEFAULT_IMAGES_CACHE.getOrDefault(itemDto.getType(),
-                                ContextCompat.getDrawable(mCardView.getContext(), R.drawable.tile_port_video));
                         showProgress = true;
                         if (imageType.equals(ImageType.POSTER)) aspect = ImageHelper.ASPECT_RATIO_2_3;
                         break;
                     default:
-                        mDefaultCardImage = DEFAULT_IMAGES_CACHE.getOrDefault(itemDto.getType(),
-                                ContextCompat.getDrawable(mCardView.getContext(), R.drawable.tile_port_video));
                         if (imageType.equals(ImageType.POSTER)) aspect = ImageHelper.ASPECT_RATIO_2_3;
                         break;
                 }
@@ -213,6 +199,26 @@ public class CardPresenter extends Presenter {
         }
     }
 
+    private String[] resolveImage(BaseRowItem rowItem, LegacyImageCardView cardView) {
+        String imageUrl = null;
+        String blurHash = null;
+        BaseItemDto baseItem = rowItem.getBaseItem();
+        if (baseItem != null) {
+            JellyfinImage primaryImage = JellyfinImageKt.getItemImages(baseItem).get(org.jellyfin.sdk.model.api.ImageType.PRIMARY);
+            if (primaryImage != null) {
+                imageUrl = imageHelper.getValue().getImageUrl(primaryImage);
+                blurHash = primaryImage.getBlurHash();
+            }
+        }
+        if (imageUrl == null) {
+            int fillWidth = Math.round(cardView.getLayoutParams().width * cardView.getResources().getDisplayMetrics().density);
+            int fillHeight = Math.round(cardView.getLayoutParams().height * cardView.getResources().getDisplayMetrics().density);
+            imageUrl = rowItem.getImageUrl(cardView.getContext(), imageHelper.getValue(), mImageType, fillWidth, fillHeight);
+        }
+        return new String[]{imageUrl, blurHash};
+    }
+
+
     @Override
     public ViewHolder onCreateViewHolder(ViewGroup parent) {
         LegacyImageCardView cardView = new LegacyImageCardView(parent.getContext(), mShowInfo);
@@ -233,9 +239,6 @@ public class CardPresenter extends Presenter {
         ViewHolder holder = (ViewHolder) viewHolder;
         BaseRowItem rowItem = (BaseRowItem) item;
 
-        String imageUrl;
-        String blurHash = null;
-
         holder.setItem(rowItem, mImageType, 130, 150, mStaticHeight);
 
         holder.mCardView.setTitleText("");
@@ -244,25 +247,40 @@ public class CardPresenter extends Presenter {
         holder.mCardView.showFavIcon(rowItem.isFavorite());
         holder.mCardView.setPlayingIndicator(rowItem instanceof AudioQueueBaseRowItem && ((AudioQueueBaseRowItem) rowItem).getPlaying());
 
-        int fillWidth = Math.round(holder.getCardWidth() * holder.mCardView.getResources().getDisplayMetrics().density);
-        int fillHeight = Math.round(holder.getCardHeight() * holder.mCardView.getResources().getDisplayMetrics().density);
-        if (rowItem.getBaseItem() != null) {
-            JellyfinImage primaryImage = JellyfinImageKt.getItemImages(rowItem.getBaseItem())
-                    .get(org.jellyfin.sdk.model.api.ImageType.PRIMARY);
-            if (primaryImage != null) {
-                imageUrl = imageHelper.getValue().getImageUrl(primaryImage);
-                blurHash = primaryImage.getBlurHash();
-            } else {
-                imageUrl = rowItem.getImageUrl(holder.mCardView.getContext(), imageHelper.getValue(),
-                        mImageType, fillWidth, fillHeight);
-            }
-        } else {
-            imageUrl = rowItem.getImageUrl(holder.mCardView.getContext(), imageHelper.getValue(),
-                    mImageType, fillWidth, fillHeight);
-        }
-
-        holder.updateCardViewImage(imageUrl, blurHash);
+        String[] imageData = resolveImage(rowItem, holder.mCardView);
+        holder.updateCardViewImage(imageData[0], imageData[1]);
     }
+
+    private Drawable getDefaultImage(Context context, BaseItemKind kind) {
+        if (!DEFAULT_IMAGES_CACHE.containsKey(kind)) {
+            int drawableRes;
+            switch (kind) {
+                case AUDIO:
+                case MUSIC_ALBUM:
+                    drawableRes = R.drawable.tile_audio;
+                    break;
+                case PERSON:
+                case MUSIC_ARTIST:
+                    drawableRes = R.drawable.tile_port_person;
+                    break;
+                case SEASON:
+                case SERIES:
+                    drawableRes = R.drawable.tile_port_tv;
+                    break;
+                case EPISODE:
+                    drawableRes = R.drawable.tile_land_tv;
+                    break;
+                case MOVIE:
+                case VIDEO:
+                default:
+                    drawableRes = R.drawable.tile_port_video;
+                    break;
+            }
+            DEFAULT_IMAGES_CACHE.put(kind, ContextCompat.getDrawable(context, drawableRes));
+        }
+        return DEFAULT_IMAGES_CACHE.get(kind);
+    }
+
 
     @Override
     public void onUnbindViewHolder(Presenter.ViewHolder viewHolder) {
