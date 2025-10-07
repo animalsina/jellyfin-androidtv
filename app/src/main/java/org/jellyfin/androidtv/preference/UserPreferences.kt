@@ -223,6 +223,11 @@ class UserPreferences(context: Context) : SharedPreferenceStore(
 		var videoStartDelay = longPreference("video_start_delay", 0)
 
 		/**
+		 * Whether to enable audio in trailers.
+		 */
+		var trailerEnabled = booleanPreference("trailer_enabled", true)
+
+		/**
 		 * The actions to take for each media segment type. Managed by the [MediaSegmentRepository].
 		 */
 		var mediaSegmentActions = stringPreference(

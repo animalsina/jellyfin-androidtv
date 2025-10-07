@@ -198,6 +198,8 @@
     <string name="pref_show_backdrop_description">Change background image to selected items</string>
     <string name="lbl_show_premieres">Show season premieres</string>
     <string name="desc_premieres">Show a row of new episode pilots for any series you watch</string>
+    <string name="pref_enable_trailer_description">Play trailer automatically if enabled</string>
+    <string name="pref_enable_trailer">Enable trailer</string>
     <string name="lbl_in_x_days">In %d days</string>
     <string name="lbl_select_date">Select date</string>
     <string name="lbl_just_this_once">Just this once</string>

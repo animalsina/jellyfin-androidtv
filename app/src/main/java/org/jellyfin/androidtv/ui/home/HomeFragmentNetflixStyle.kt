@@ -18,6 +18,8 @@ import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.findViewTreeLifecycleOwner
 import androidx.core.view.doOnAttach
+import androidx.core.view.isVisible
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filterNotNull
@@ -26,6 +28,7 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.jellyfin.androidtv.R
@@ -46,14 +49,18 @@ import org.jellyfin.androidtv.util.apiclient.itemBackdropImages
 import org.jellyfin.androidtv.util.apiclient.parentBackdropImages
 import org.jellyfin.androidtv.util.apiclient.seriesThumbImage
 import org.jellyfin.androidtv.data.repository.UserViewsRepository
+import org.jellyfin.androidtv.preference.UserPreferences
 import org.jellyfin.androidtv.ui.itemhandling.ItemLauncher
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.ImageType
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.CollectionType
+import org.koin.android.ext.android.get
 import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.activityViewModel
 import timber.log.Timber
+import java.net.HttpURLConnection
+import java.net.URL
 import java.net.URLEncoder
 
 class HomeFragmentNetflixStyle : Fragment() {
@@ -80,11 +87,13 @@ class HomeFragmentNetflixStyle : Fragment() {
 	private lateinit var previewPoster: AsyncImageView
 	private lateinit var contentView: FragmentContainerView
 	private lateinit var previewSubtitle: TextView
+
 	// Trailer
 	private lateinit var trailerContainer: FrameLayout
 	private lateinit var trailerWebView: WebView
 	private val trailerCache = mutableMapOf<String, String>()
 	private var trailerJob: Job? = null
+	private var trailerHideJob: Job? = null
 
 	override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
 		val view = inflater.inflate(R.layout.fragment_home_netflix_style, container, false)
@@ -151,6 +160,7 @@ class HomeFragmentNetflixStyle : Fragment() {
 	fun updatePreviewSection(item: BaseRowItem?) {
 		resetTrailerTimer()
 		resetTrailer()
+		cancelTrailerHide()
 
 		if (item == null || item.baseItem == null) {
 			// Hide and clear preview when no item is selected
@@ -218,8 +228,9 @@ class HomeFragmentNetflixStyle : Fragment() {
 		// Keep poster hidden - don't show the card on top right
 		previewPoster.visibility = View.GONE
 
-		// Avvia timer per il trailer
-		playYouTubeTrailerWithDelay(item)
+		if (isTrailerEnabled()) {
+			playYouTubeTrailerWithDelay(item)
+		}
 	}
 
 	private fun updateMetadata(item: BaseItemDto) {
@@ -559,10 +570,12 @@ class HomeFragmentNetflixStyle : Fragment() {
 			}
 
 			trailerName = trailerName + " (${baseItem.productionYear}) official trailer"
-			if(baseItem.tags != null){
+			if (baseItem.tags != null) {
 				trailerName = trailerName + " " + baseItem.tags?.joinToString(" ")
 			}
+
 			Timber.d("Fetching trailer for $trailerName")
+
 			fetchTrailerFromYouTube(trailerName) { videoId ->
 				if (videoId.isNotEmpty()) {
 					trailerCache[itemId] = videoId
@@ -575,53 +588,32 @@ class HomeFragmentNetflixStyle : Fragment() {
 	}
 
 	private fun startTrailer(videoId: String) {
-		// Imposta dimensioni WebView
-		trailerContainer.layoutParams.width = previewBackground.width
-		trailerContainer.layoutParams.height = previewBackground.height
+		val width = previewBackground.width
+		val height = (width * 9) / 16
+		trailerContainer.layoutParams.width = width
+		trailerContainer.layoutParams.height = height
 		trailerContainer.requestLayout()
 
-		// Nascondi WebView inizialmente
 		trailerContainer.visibility = View.VISIBLE
-		trailerContainer.alpha = 0f // invisibile ma occupa spazio
+		trailerContainer.alpha = 0f
 
-		val embedUrl = "https://www.youtube.com/embed/$videoId?autoplay=1&mute=1&controls=0"
+		val embedUrl = "https://www.youtube.com/embed/$videoId?autoplay=1&mute=1&controls=0&rel=0&modestbranding=1"
 
-		// WebViewClient per rilevare caricamento
 		trailerWebView.webViewClient = object : WebViewClient() {
 			override fun onPageFinished(view: WebView?, url: String?) {
 				super.onPageFinished(view, url)
 
-				trailerWebView.evaluateJavascript(
-					"""
-                (function() {
-                    var errorMessage = document.querySelector('.ytp-error .ytp-error-content-wrap');
-                    return errorMessage ? errorMessage.innerText : '';
-                })();
-                """
-				) { result ->
-					val text = result.trim('"')  // rimuove le virgolette di ritorno JS
-					if (text.contains("Video unavailable", ignoreCase = true)) {
-						Timber.w("Trailer non disponibile")
-						resetTrailer()
-					} else if (text.contains("This video is age-restricted and only available on YouTube", ignoreCase = true)) {
-						Timber.w("Trailer non disponibile")
-						resetTrailer()
-					} else {
-						// Mostra la WebView solo se il video è disponibile
-						// Dopo 1.2s simuliamo caricamento e rendiamo visibile
-						viewLifecycleOwner.lifecycleScope.launch {
-							delay(1200)
-							if (isAdded && isVisible) {
-								trailerContainer.animate()
-									.alpha(1f)
-									.setDuration(300)
-									.start()
-								Timber.d("Trailer mostrato: $embedUrl")
-							}
-						}
+				viewLifecycleOwner.lifecycleScope.launch {
+					delay(1200)
+					if (isAdded && isVisible) {
+						trailerContainer.animate()
+							.alpha(1f)
+							.setDuration(300)
+							.start()
 					}
 				}
 			}
+
 			override fun onReceivedError(
 				view: WebView?,
 				request: android.webkit.WebResourceRequest?,
@@ -629,7 +621,7 @@ class HomeFragmentNetflixStyle : Fragment() {
 			) {
 				super.onReceivedError(view, request, error)
 				Timber.w("Errore caricamento trailer: ${error?.description}")
-				resetTrailer() // nascondi WebView
+				resetTrailer()
 			}
 
 			override fun onReceivedHttpError(
@@ -643,46 +635,94 @@ class HomeFragmentNetflixStyle : Fragment() {
 			}
 		}
 
-		trailerWebView.loadUrl(embedUrl)
-		Timber.d("Trailer caricato in background: $embedUrl")
+		// Carica HTML con iframe riempitivo (object-fit: cover) per eliminare bande nere
+		val html = """
+        <html>
+        <head>
+            <style>
+                body, html {
+                    margin: 0;
+                    padding: 0;
+                    height: 100%;
+                    overflow: hidden;
+                    background: black;
+                }
+                iframe {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    object-fit: cover;
+                }
+            </style>
+        </head>
+        <body>
+            <iframe src="$embedUrl" frameborder="0" allowfullscreen allow="autoplay"></iframe>
+        </body>
+        </html>
+    """.trimIndent()
 
-		viewLifecycleOwner.lifecycleScope.launch {
-			delay(30_000) // 30 secondi
-			if (isAdded && trailerContainer.visibility == View.VISIBLE) {
+		trailerWebView.loadData(html, "text/html", "utf-8")
+
+		// Timer per nascondere il trailer dopo 2 minuti
+		trailerHideJob?.cancel()
+		trailerHideJob = viewLifecycleOwner.lifecycleScope.launch {
+			delay(120_000)
+			if (isAdded && trailerContainer.isVisible) {
 				trailerContainer.animate()
 					.alpha(0f)
 					.setDuration(800)
 					.withEndAction {
 						trailerContainer.visibility = View.GONE
-						trailerWebView.loadUrl("about:blank") // libera la memoria
+						trailerWebView.loadUrl("about:blank") // libera memoria
 					}
 					.start()
-				Timber.d("Trailer nascosto dopo 30s")
 			}
 		}
 	}
 
+
+	fun cancelTrailerHide() {
+		trailerHideJob?.cancel()
+		trailerHideJob = null
+	}
+
 	private fun fetchTrailerFromYouTube(query: String, callback: (String) -> Unit) {
-		// Nota: lo scraping di YouTube è fragile, considera YouTube Data API per stabilità
-		Thread {
+		// lifecycleScope disponibile in Fragment/Activity
+		viewLifecycleOwner.lifecycleScope.launch {
 			try {
-				val encodedQuery = URLEncoder.encode(query, "UTF-8")
-				val url = "https://www.youtube.com/results?search_query=$encodedQuery"
-				val client = OkHttpClient()
-				val request = Request.Builder().url(url)
-					.header("User-Agent", "Mozilla/5.0")
-					.build()
-				val res = client.newCall(request).execute()
-				val body = res.body?.string() ?: ""
-				val regex = """/watch\?v=([a-zA-Z0-9_-]{11})""".toRegex()
-				val match = regex.find(body)
-				val videoId = match?.groups?.get(1)?.value ?: ""
-				requireActivity().runOnUiThread { callback(videoId) }
+				// Tutto il lavoro di rete nel contesto IO
+				val videoId = withContext(Dispatchers.IO) {
+					val encodedQuery = URLEncoder.encode(query, "UTF-8")
+					val searchUrl = "https://www.youtube.com/results?search_query=$encodedQuery"
+
+					// OkHttp per scaricare HTML
+					val client = OkHttpClient()
+					val request = Request.Builder()
+						.url(searchUrl)
+						.header("User-Agent", "Mozilla/5.0")
+						.build()
+
+					val res = client.newCall(request).execute()
+					val body = res.body?.string().orEmpty()
+
+					// Estrazione primo video ID
+					val regex = """/watch\?v=([a-zA-Z0-9_-]{11})""".toRegex()
+					regex.find(body)?.groups?.get(1)?.value.orEmpty()
+				}
+
+				// Controllo embeddabilità (funzione sincrona dentro IO)
+				if (!checkedAllowedYoutubeVideo("https://www.youtube.com/watch?v=$videoId")) {
+					throw Exception("Not allowed video")
+				}
+				// Callback sul main thread
+				callback(videoId)
 			} catch (e: Exception) {
 				Timber.e(e, "Failed to fetch YouTube trailer")
-				requireActivity().runOnUiThread { callback("") }
+				callback("")
 			}
-		}.start()
+		}
 	}
 
 	private fun resetPreview() {
@@ -712,22 +752,43 @@ class HomeFragmentNetflixStyle : Fragment() {
 	}
 
 	fun playYouTubeTrailerWithDelay(item: BaseRowItem) {
-		// Cancella eventuale trailer pendente
-		trailerJob?.cancel()
-
 		trailerJob = viewLifecycleOwner.lifecycleScope.launch {
-			delay(5000) // 5 secondi
+			delay(2000)
 
 			if (isAdded && isVisible) {
-				playYouTubeTrailer(item) // chiama la versione aggiornata
+				playYouTubeTrailer(item)
 			}
 		}
 	}
 
-	// Quando la preview viene resettata o selezioniamo un nuovo item
 	private fun resetTrailerTimer() {
 		trailerJob?.cancel()
 		trailerJob = null
 	}
 
+
+	suspend fun checkedAllowedYoutubeVideo(videoUrl: String): Boolean = withContext(Dispatchers.IO) {
+		try {
+			// Non codificare l'intero URL, oEmbed richiede URL leggibile
+			val apiUrl = "https://www.youtube.com/oembed?url=$videoUrl&format=json"
+
+			val connection = URL(apiUrl).openConnection() as HttpURLConnection
+			connection.requestMethod = "GET"
+			connection.connectTimeout = 5000
+			connection.readTimeout = 5000
+
+			val code = connection.responseCode
+			connection.disconnect()
+
+			code == HttpURLConnection.HTTP_OK
+		} catch (e: Exception) {
+			Timber.e(e, "Failed to check YouTube video")
+			false
+		}
+	}
+
+	private fun isTrailerEnabled(): Boolean {
+		val userPreferences = get<UserPreferences>()
+		return userPreferences[UserPreferences.trailerEnabled]
+	}
 }
