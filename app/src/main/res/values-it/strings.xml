@@ -646,4 +646,5 @@
     <string name="lbl_reality">Reality</string>
     <string name="lbl_talk_show">Talk Show</string>
     <string name="pref_subtitles_position">Distanza dal basso</string>
+    <string name="lbl_more_info">Altre Info</string>
 </resources>

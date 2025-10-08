@@ -92,12 +92,15 @@ class HomeFragmentNetflixStyle : Fragment() {
 	// Trailer
 	private lateinit var trailerContainer: FrameLayout
 	private lateinit var trailerWebView: WebView
+	private lateinit var trailerGradientOverlay: View
+
 	private val trailerCache = mutableMapOf<String, String>()
 	private var trailerJob: Job? = null
 	private var trailerHideJob: Job? = null
 
 	companion object {
-		private val TRAILER_TYPES = setOf(BaseItemKind.SERIES, BaseItemKind.EPISODE, BaseItemKind.MOVIE, BaseItemKind.SEASON, BaseItemKind.VIDEO)
+		private val TRAILER_TYPES =
+			setOf(BaseItemKind.SERIES, BaseItemKind.EPISODE, BaseItemKind.MOVIE, BaseItemKind.SEASON, BaseItemKind.VIDEO)
 	}
 
 	override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
@@ -120,11 +123,15 @@ class HomeFragmentNetflixStyle : Fragment() {
 		trailerContainer = view.findViewById<FrameLayout>(R.id.trailer_container).apply {
 			visibility = View.GONE
 		}
+		trailerGradientOverlay = view.findViewById(R.id.trailer_gradient_overlay)
+		trailerGradientOverlay.visibility = View.GONE
 
 		trailerWebView = view.findViewById<WebView>(R.id.trailer_webview).apply {
 			webViewClient = WebViewClient()
 			settings.loadWithOverviewMode = true
 			settings.useWideViewPort = true
+			settings.mediaPlaybackRequiresUserGesture = false
+			settings.domStorageEnabled = true
 			settings.javaScriptEnabled = true
 		}
 
@@ -234,7 +241,7 @@ class HomeFragmentNetflixStyle : Fragment() {
 		previewPoster.visibility = View.GONE
 
 		if (isTrailerEnabled()) {
-			if(TRAILER_TYPES.contains(item.baseItem.type)) {
+			if (TRAILER_TYPES.contains(item.baseItem.type)) {
 				playYouTubeTrailerWithDelay(item)
 			}
 		}
@@ -603,6 +610,7 @@ class HomeFragmentNetflixStyle : Fragment() {
 
 		trailerContainer.visibility = View.VISIBLE
 		trailerContainer.alpha = 0f
+		trailerGradientOverlay.visibility = View.VISIBLE
 
 		val embedUrl = "https://www.youtube.com/embed/$videoId?autoplay=1&mute=1&controls=0&rel=0&modestbranding=1"
 
@@ -610,14 +618,14 @@ class HomeFragmentNetflixStyle : Fragment() {
 			override fun onPageFinished(view: WebView?, url: String?) {
 				super.onPageFinished(view, url)
 
+				if (!isAdded || getView() == null || !isVisible) return
+
 				viewLifecycleOwner.lifecycleScope.launch {
 					delay(1200)
-					if (isAdded && isVisible) {
-						trailerContainer.animate()
-							.alpha(1f)
-							.setDuration(300)
-							.start()
-					}
+					trailerContainer.animate()
+						.alpha(1f)
+						.setDuration(300)
+						.start()
 				}
 			}
 
@@ -642,7 +650,6 @@ class HomeFragmentNetflixStyle : Fragment() {
 			}
 		}
 
-		// Carica HTML con iframe riempitivo (object-fit: cover) per eliminare bande nere
 		val html = """
         <html>
         <head>
@@ -672,7 +679,6 @@ class HomeFragmentNetflixStyle : Fragment() {
 
 		trailerWebView.loadData(html, "text/html", "utf-8")
 
-		// Timer per nascondere il trailer dopo 2 minuti
 		trailerHideJob?.cancel()
 		trailerHideJob = viewLifecycleOwner.lifecycleScope.launch {
 			delay(120_000)
@@ -682,7 +688,7 @@ class HomeFragmentNetflixStyle : Fragment() {
 					.setDuration(800)
 					.withEndAction {
 						trailerContainer.visibility = View.GONE
-						trailerWebView.loadUrl("about:blank") // libera memoria
+						trailerWebView.loadUrl("about:blank")
 					}
 					.start()
 			}
@@ -721,7 +727,7 @@ class HomeFragmentNetflixStyle : Fragment() {
 
 				callback(videoId)
 			} catch (e: Exception) {
-				Timber.e(e, "Failed to fetch YouTube trailer")
+				Timber.w(e, "Failed to fetch YouTube trailer")
 				callback("")
 			}
 		}
@@ -751,6 +757,7 @@ class HomeFragmentNetflixStyle : Fragment() {
 		trailerWebView.loadUrl("about:blank")
 		trailerContainer.visibility = View.GONE
 		trailerContainer.alpha = 0f
+		trailerGradientOverlay.visibility = View.GONE
 	}
 
 	fun playYouTubeTrailerWithDelay(item: BaseRowItem) {
@@ -771,7 +778,6 @@ class HomeFragmentNetflixStyle : Fragment() {
 
 	suspend fun checkedAllowedYoutubeVideo(videoUrl: String): Boolean = withContext(Dispatchers.IO) {
 		try {
-			// Non codificare l'intero URL, oEmbed richiede URL leggibile
 			val apiUrl = "https://www.youtube.com/oembed?url=$videoUrl&format=json"
 
 			val connection = URL(apiUrl).openConnection() as HttpURLConnection
