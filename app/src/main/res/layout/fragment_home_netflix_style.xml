@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
@@ -36,6 +35,13 @@
             android:id="@+id/trailer_webview"
             android:layout_width="match_parent"
             android:layout_height="match_parent" />
+
+        <View
+            android:id="@+id/trailer_gradient_overlay"
+            android:layout_width="600dp"
+            android:layout_height="450dp"
+            android:background="@drawable/home_preview_corner_gradient"
+            android:visibility="gone" />
     </FrameLayout>
 
     <!-- Gradient overlay to fade the image edges -->
@@ -93,7 +99,7 @@
                     android:textAllCaps="true"
                     android:letterSpacing="0.1"
                     android:fontFamily="sans-serif-medium"
-                    android:text="FILM"
+                    android:text="@string/lbl_movie"
                     android:visibility="gone" />
 
                 <!-- Title -->
@@ -131,7 +137,7 @@
                         android:id="@+id/preview_badge_new"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="New"
+                        android:text="@string/lbl_new"
                         android:textColor="#46d369"
                         android:textSize="16sp"
                         android:fontFamily="sans-serif-medium"
@@ -206,7 +212,7 @@
                         android:id="@+id/preview_play_button"
                         android:layout_width="wrap_content"
                         android:layout_height="48dp"
-                        android:text="Play"
+                        android:text="@string/lbl_play"
                         android:textColor="@android:color/black"
                         android:backgroundTint="@android:color/white"
                         android:layout_marginEnd="12dp"
@@ -216,7 +222,7 @@
                         android:id="@+id/preview_more_info_button"
                         android:layout_width="wrap_content"
                         android:layout_height="48dp"
-                        android:text="More Info"
+                        android:text="@string/lbl_more_info"
                         android:textColor="@android:color/white"
                         android:backgroundTint="#333333"
                         style="@style/Widget.AppCompat.Button" />
