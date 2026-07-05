@@ -1,3 +1,11 @@
+# Changelog
+
+## v1.0.11
+
+- Migliorata la configurazione di build: Gradle ora può risolvere automaticamente il toolchain Java 21 richiesto dal progetto quando non è installato localmente.
+- Aggiunto nome esplicito al progetto `buildSrc` per evitare instabilità/cache diverse tra cartelle di checkout.
+- Documentata la soluzione per l'errore di compilazione legato a Java 21.
+
 ## v1.0.10 - 2026-07-05
 
 - Corretto il comportamento mobile/touch della home rimuovendo la richiesta di focus XML dal contenitore delle righe e applicandola solo sui dispositivi TV/D-pad.

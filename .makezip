@@ -44,7 +44,7 @@
   "delete_returned_zips_after_apply": true,
   "apply_keep_restore": true,
   "apply_restore_path": "~/tmp/{project_name}/.makezip_restore",
-  "apply_last_returned_zip_path": ".makezip_restore/last-applied-returned.zip",
+  "apply_last_returned_zip_path": "~/tmp/{project_name}/.makezip_restore/last-applied-returned.zip",
   "apply_fail_on_sensitive": false,
   "use_ignore_files": true,
   "ignore_files": [
