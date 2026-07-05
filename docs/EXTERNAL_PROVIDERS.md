@@ -2,30 +2,45 @@
 
 ## Goal
 
-SuperJelly should eventually show legal watch options next to Jellyfin results: play locally when the movie exists in Jellyfin, otherwise open an installed provider app directly on the matching title when a stable deep link exists.
+SuperJelly should not behave like a simple app launcher. External services should appear as catalog rows when a legal, reachable catalog/feed exists, so a free movie or episode can look and feel like a Jellyfin item in the home. When the title cannot be played internally, the user should still be able to open the installed provider app on the best available destination.
 
-## Current provider status
+## Implemented in v1.0.15
+
+- The old external provider row is now treated as a streaming catalog row.
+- Pluto TV VOD Italy is loaded from a catalog playlist and rendered as normal home cards with remote poster/backdrop URLs.
+- Empty external rows stay hidden, so the home never shows a big placeholder when a feed is unavailable.
+- Selecting a Pluto VOD card tries to open the stream URL first, then falls back to the provider detail URL.
+- Movie and series detail pages now expose a “Where to watch” action.
+- Provider actions are filtered by installed app package where possible, so unavailable apps are not promoted as direct provider actions.
+- A generic JustWatch search remains available as an online availability lookup fallback because exact provider availability requires a data feed/API contract.
+
+## Provider status
 
 ### Pluto TV
 
-- Best first candidate for native rows because community tooling and public playlists can expose live channels and some VOD entries as M3U/EPG data.
-- Free ad-supported streams can often be opened as HLS, but availability, regions and URLs change frequently.
-- Recommended next implementation: configurable M3U source, cached catalog, title matching, and playback through Jellyfin/SuperJelly player only for direct HLS streams that are reachable without DRM or proprietary app state.
+- Best current candidate for catalog rows because VOD playlists can expose titles, logos, groups and HLS URLs.
+- Streams are free/ad-supported, but regional restrictions and tokenized URLs can change.
+- Current adapter uses the Italy VOD playlist and keeps the integration defensive: no row is shown if the playlist cannot be read or contains no playable entries.
 
 ### RaiPlay
 
-- RaiPlay has a free on-demand catalog and Android TV app, but no stable public API contract for third-party catalog ingestion was found in this pass.
-- Stream extraction is possible in community tools, but it should be treated as fragile and refreshed often.
-- Recommended next implementation: open installed RaiPlay Android TV app reliably first; add optional catalog ingestion later only behind a feature flag.
+- RaiPlay has a free catalog and Android TV app, but this pass did not add a stable RaiPlay catalog adapter because there is no public API contract in the app.
+- Recommended next step: add a feature-flagged RaiPlay adapter only after choosing a reliable catalog source and a safe refresh/cache strategy.
 
-### Prime Video
+### Prime Video and Netflix
 
-- Prime Video does not provide a public third-party catalog/player API suitable for importing lists into SuperJelly.
-- Direct playback inside SuperJelly is not realistic because Prime Video content is DRM/account/app controlled.
-- Recommended next implementation: title-aware web/app deep link attempts when an external ID or known Prime URL is available; otherwise open Prime Video app/home search.
+- These services can be surfaced as “available on” actions only when the app is installed or through a generic availability search.
+- Internal playback inside SuperJelly is not a realistic target without provider authorization, DRM handling and official deep-link/player contracts.
+- Current behavior avoids pretending these are local Jellyfin items unless a real catalog/playback source exists.
 
-## Implemented in v1.0.14
+## Next safe step
 
-- Replaced the old “Watch outside Jellyfin” label with a generic streaming provider row.
-- Improved provider app launching by checking Android TV package variants before falling back to provider URLs or Play Store.
-- Kept the integration conservative: no fake catalog rows are shown until a provider source can be resolved reliably.
+Add a configurable provider catalog registry:
+
+1. Provider id/name/icon.
+2. Catalog URL or official feed source.
+3. Parser type: M3U, JSON feed, partner API.
+4. Country/language.
+5. Cache TTL and last successful snapshot.
+6. Capability flags: internal HLS playback, app deep link, browser fallback, subscription-only.
+7. Per-provider visibility preferences.

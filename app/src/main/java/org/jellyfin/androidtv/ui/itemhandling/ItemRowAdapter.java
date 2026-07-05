@@ -100,6 +100,7 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
 
     private boolean preferParentThumb = false;
     private boolean staticHeight = false;
+    private boolean suppressEmptyPlaceholder = false;
 
     private final Lazy<org.jellyfin.sdk.api.client.ApiClient> api = inject(org.jellyfin.sdk.api.client.ApiClient.class);
     private final Lazy<UserViewsRepository> userViewsRepository = inject(UserViewsRepository.class);
@@ -139,6 +140,10 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
 
     public void setReRetrieveTriggers(ChangeTriggerType[] reRetrieveTriggers) {
         this.reRetrieveTriggers = reRetrieveTriggers;
+    }
+
+    public void setSuppressEmptyPlaceholder(boolean value) {
+        this.suppressEmptyPlaceholder = value;
     }
 
     public ItemRowAdapter(Context context, GetItemsRequest query, int chunkSize, boolean preferParentThumb, Presenter presenter, MutableObjectAdapter<Row> parent) {
@@ -460,7 +465,7 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
             mParent.remove(siblingRow);
         }
 
-        if (mParent.size() == 1) {
+        if (mParent.size() == 1 && !suppressEmptyPlaceholder) {
             // we will be removing the last row - show something and prevent the framework from crashing
             // because there is nowhere for focus to land
             ArrayObjectAdapter emptyRow = new ArrayObjectAdapter(new TextItemPresenter());

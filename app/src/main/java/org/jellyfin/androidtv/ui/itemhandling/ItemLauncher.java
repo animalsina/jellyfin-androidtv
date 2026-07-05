@@ -16,6 +16,7 @@ import org.jellyfin.androidtv.preference.LibraryPreferences;
 import org.jellyfin.androidtv.preference.PreferencesRepository;
 import org.jellyfin.androidtv.ui.navigation.Destination;
 import org.jellyfin.androidtv.ui.navigation.Destinations;
+import org.jellyfin.androidtv.streaming.ExternalCatalogLauncher;
 import org.jellyfin.androidtv.ui.navigation.NavigationRepository;
 import org.jellyfin.androidtv.ui.playback.MediaManager;
 import org.jellyfin.androidtv.ui.playback.PlaybackLauncher;
@@ -72,6 +73,11 @@ public class ItemLauncher {
     }
 
     public void launch(final BaseRowItem rowItem, MutableObjectAdapter<Object> adapter, final Context context) {
+        if (rowItem instanceof ExternalCatalogBaseRowItem) {
+            ExternalCatalogLauncher.open(context, (ExternalCatalogBaseRowItem) rowItem);
+            return;
+        }
+
         switch (rowItem.getBaseRowType()) {
             case BaseItem:
                 BaseItemDto baseItem = rowItem.getBaseItem();

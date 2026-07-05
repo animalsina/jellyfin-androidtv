@@ -3,10 +3,13 @@ package org.jellyfin.androidtv.ui.settings.screen.home
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.res.stringResource
 import org.jellyfin.androidtv.R
+import org.jellyfin.androidtv.constant.CustomMessage
 import org.jellyfin.androidtv.constant.HomeSectionType
+import org.jellyfin.androidtv.data.repository.CustomMessageRepository
 import org.jellyfin.androidtv.preference.UserSettingPreferences
 import org.jellyfin.androidtv.ui.base.Text
 import org.jellyfin.androidtv.ui.base.form.RadioButton
@@ -16,12 +19,15 @@ import org.jellyfin.androidtv.ui.base.list.ListSection
 import org.jellyfin.androidtv.ui.navigation.LocalRouter
 import org.jellyfin.androidtv.ui.settings.compat.rememberPreference
 import org.jellyfin.androidtv.ui.settings.composable.SettingsColumn
+import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 
 @Composable
 fun SettingsHomeSectionScreen(index: Int) {
 	val router = LocalRouter.current
 	val userSettingPreferences = koinInject<UserSettingPreferences>()
+	val customMessageRepository = koinInject<CustomMessageRepository>()
+	val scope = rememberCoroutineScope()
 	val sectionPreference = userSettingPreferences.homesections.getOrNull(index)
 
 	if (sectionPreference == null) {
@@ -48,7 +54,12 @@ fun SettingsHomeSectionScreen(index: Int) {
 				trailingContent = { RadioButton(checked = sectionType == entry) },
 				onClick = {
 					sectionType = entry
-					router.back()
+					userSettingPreferences[sectionPreference] = entry
+					scope.launch {
+						userSettingPreferences.commit()
+						customMessageRepository.pushMessage(CustomMessage.RefreshHomeRows)
+						router.back()
+					}
 				}
 			)
 		}

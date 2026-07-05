@@ -52,6 +52,7 @@ import org.jellyfin.androidtv.preference.constant.ClockBehavior;
 import org.jellyfin.androidtv.ui.InteractionTrackerViewModel;
 import org.jellyfin.androidtv.ui.RecordPopup;
 import org.jellyfin.androidtv.ui.RecordingIndicatorView;
+import org.jellyfin.androidtv.streaming.StreamingAvailabilityHelper;
 import org.jellyfin.androidtv.ui.TextUnderButton;
 import org.jellyfin.androidtv.ui.browsing.BrowsingUtils;
 import org.jellyfin.androidtv.ui.itemhandling.BaseRowItem;
@@ -762,6 +763,7 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
     TextUnderButton moreButton;
     TextUnderButton playButton = null;
     TextUnderButton trailerButton = null;
+    TextUnderButton streamingAvailabilityButton = null;
 
     private void addButtons(int buttonSize) {
         BaseItemDto baseItem = mBaseItem;
@@ -864,6 +866,16 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
             });
 
             mDetailsOverviewRow.addAction(trailerButton);
+        }
+
+        if (StreamingAvailabilityHelper.shouldOfferAvailabilityButton(requireContext(), mBaseItem)) {
+            streamingAvailabilityButton = TextUnderButton.create(requireContext(), R.drawable.ic_search, buttonSize, 0, getString(R.string.lbl_streaming_availability), new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    StreamingAvailabilityHelper.openAvailabilityMenu(requireContext(), mBaseItem);
+                }
+            });
+            mDetailsOverviewRow.addAction(streamingAvailabilityButton);
         }
 
         if (mProgramInfo != null && Utils.canManageRecordings(KoinJavaComponent.<UserRepository>get(UserRepository.class).getCurrentUser().getValue())) {
@@ -1127,6 +1139,7 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
         // added in order of priority (should match res/menu/menu_details_more.xml)
         if (queueButton != null) actionsList.add(queueButton);
         if (trailerButton != null) actionsList.add(trailerButton);
+        if (streamingAvailabilityButton != null) actionsList.add(streamingAvailabilityButton);
         if (shuffleButton != null) actionsList.add(shuffleButton);
         if (favButton != null) actionsList.add(favButton);
         if (goToSeriesButton != null) actionsList.add(goToSeriesButton);

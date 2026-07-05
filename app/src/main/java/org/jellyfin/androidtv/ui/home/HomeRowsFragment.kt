@@ -40,6 +40,7 @@ import org.jellyfin.androidtv.constant.LiveTvOption
 import org.jellyfin.androidtv.constant.QueryType
 import org.jellyfin.androidtv.data.model.DataRefreshService
 import org.jellyfin.androidtv.data.repository.CustomMessageRepository
+import org.jellyfin.androidtv.data.repository.ExternalCatalogRepository
 import org.jellyfin.androidtv.data.repository.NotificationsRepository
 import org.jellyfin.androidtv.data.repository.UserViewsRepository
 import org.jellyfin.androidtv.data.service.BackgroundService
@@ -83,12 +84,13 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	private val userViewsRepository by inject<UserViewsRepository>()
 	private val dataRefreshService by inject<DataRefreshService>()
 	private val customMessageRepository by inject<CustomMessageRepository>()
+	private val externalCatalogRepository by inject<ExternalCatalogRepository>()
 	private val navigationRepository by inject<NavigationRepository>()
 	private val itemLauncher by inject<ItemLauncher>()
 	private val keyProcessor by inject<KeyProcessor>()
 	private val homePreviewViewModel: HomePreviewViewModel by activityViewModel()
 
-	private val helper by lazy { HomeFragmentHelper(requireContext(), userRepository) }
+	private val helper by lazy { HomeFragmentHelper(requireContext(), userRepository, externalCatalogRepository) }
 	private val useTouchHomeNavigation by lazy { TouchNavigationHelper.shouldUseTouchHomeNavigation(requireContext()) }
 	private var touchHomeDownX = 0f
 	private var touchHomeDownY = 0f
@@ -115,6 +117,8 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	private var currentRow: ListRow? = null
 	private var justLoaded = true
 	private var selectedPreviewJob: Job? = null
+	private var buildRowsJob: Job? = null
+	private var loadedHomeSections: List<HomeSectionType> = emptyList()
 
 	// Special rows
 	private val notificationsRow by lazy { NotificationsHomeFragmentRow(lifecycleScope, notificationsRepository) }
@@ -158,6 +162,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 		customMessageRepository.message.flowWithLifecycle(lifecycle, Lifecycle.State.RESUMED).onEach { message ->
 			when (message) {
 				CustomMessage.RefreshCurrentItem -> refreshCurrentItem()
+				CustomMessage.RefreshHomeRows -> buildHomeRows(forceUpdateSettings = true)
 				else -> Unit
 			}
 		}.launchIn(lifecycleScope)
@@ -334,14 +339,16 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 		}
 	}
 
-	private fun buildHomeRows() {
-		lifecycleScope.launch {
+	private fun buildHomeRows(forceUpdateSettings: Boolean = false) {
+		buildRowsJob?.cancel()
+		buildRowsJob = lifecycleScope.launch {
 			val currentUser = withTimeout(30.seconds) {
 				userRepository.currentUser.filterNotNull().first()
 			}
 
-			if (userSettingPreferences.shouldUpdate) userSettingPreferences.update()
+			if (forceUpdateSettings || userSettingPreferences.shouldUpdate) userSettingPreferences.update()
 			val homeSections = userSettingPreferences.activeHomesections
+			loadedHomeSections = homeSections
 			val userViews = userViewsRepository.views.first()
 			var includeLiveTvRows = false
 
@@ -365,7 +372,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 			val rowsAdapter = adapter as MutableObjectAdapter<Row>
 			val cardPresenter = CardPresenter(true, org.jellyfin.androidtv.constant.ImageType.POSTER, 120)
 			val ctx = requireContext()
-			val recyclerView = view as? androidx.recyclerview.widget.RecyclerView
+			val recyclerView = verticalGridView
 			var initialPreviewSet = false
 
 			withContext(Dispatchers.Main) {
@@ -378,7 +385,9 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 				if (row == null) return
 				withContext(Dispatchers.Main) {
 					val touchScrollAnchor = captureTouchScrollAnchor(recyclerView)
+					val rowCountBefore = rowsAdapter.size()
 					row.addToRowsAdapter(ctx, cardPresenter, rowsAdapter)
+					if (rowsAdapter.size() == rowCountBefore) return@withContext
 					recyclerView?.post { restoreTouchScrollAnchor(recyclerView, touchScrollAnchor) }
 					if (!initialPreviewSet) {
 						initialPreviewSet = true
@@ -479,9 +488,16 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 		}
 
 		if (!justLoaded) {
-			//Re-retrieve anything that needs it but delay slightly so we don't take away gui landing
-			refreshCurrentItem()
-			refreshRows()
+			lifecycleScope.launch {
+				if (userSettingPreferences.shouldUpdate) userSettingPreferences.update()
+				if (userSettingPreferences.activeHomesections != loadedHomeSections) {
+					buildHomeRows(forceUpdateSettings = false)
+				} else {
+					// Re-retrieve anything that needs it but delay slightly so we don't take away gui landing
+					refreshCurrentItem()
+					refreshRows()
+				}
+			}
 		} else {
 			justLoaded = false
 		}
@@ -520,6 +536,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 
 	override fun onDestroy() {
 		selectedPreviewJob?.cancel()
+		buildRowsJob?.cancel()
 		verticalGridView?.setOnTouchListener(null)
 
 		super.onDestroy()

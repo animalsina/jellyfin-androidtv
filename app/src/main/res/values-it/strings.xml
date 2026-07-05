@@ -292,7 +292,6 @@
     <string name="lbl_manage_servers">Gestisci i server</string>
     <string name="pref_default_rating">Tipo di rating preferito</string>
     <string name="login_help_description">SuperJelly ha bisogno di un server Jellyfin a cui connettersi. Visita la nostra documentazione su docs.jellyfin.org o scansiona il codice QR per iniziare con Jellyfin.</string>
-    <string name="login_help_description">Jellyfin ha bisogno di un server a cui connettersi. Visita la nostra documentazione su docs.jellyfin.org o scansiona il codice QR per iniziare con Jellyfin.</string>
     <string name="login_help_title">Hai bisogno d\'aiuto\?</string>
     <string name="connect_manually_by_address">Inserisci l\'indirizzo del server</string>
     <string name="discovered_servers_empty">Nessun server trovato nella rete locale.</string>
@@ -362,6 +361,14 @@
     <string name="home_prefs">Pagina iniziale</string>
     <string name="home_section_i">Pagina iniziale sezione %1$d</string>
     <string name="home_section_none">Nessuna</string>
+    <string name="home_section_external_catalog">Catalogo streaming gratuito</string>
+    <string name="lbl_external_catalog_free_badge">Gratis</string>
+    <string name="lbl_streaming_availability">Dove guardarlo</string>
+    <string name="lbl_streaming_search_free_sources">Cerca fonti gratis/incluse online</string>
+    <string name="lbl_streaming_search_on_provider">Cerca su %1$s</string>
+    <string name="msg_streaming_no_installed_provider">Nessuna app streaming supportata è installata su questo dispositivo.</string>
+    <string name="msg_external_catalog_unavailable">Impossibile aprire questo contenuto esterno.</string>
+    <string name="home_section_external_providers">Cataloghi streaming</string>
     <string name="home_section_livetv">Diretta TV</string>
     <string name="home_section_next_up">Prossimo</string>
     <string name="home_section_active_recordings">Registrazioni attive</string>

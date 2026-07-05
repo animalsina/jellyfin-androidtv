@@ -8,4 +8,5 @@ object ExternalProviderOption {
 	const val PLUTO_TV_PACKAGE = "tv.pluto.android"
 	const val RAIPLAY_PACKAGE = "it.rainet.androidtv"
 	const val PRIME_VIDEO_PACKAGE = "com.amazon.amazonvideo.livingroom"
+	const val NETFLIX_PACKAGE = "com.netflix.ninja"
 }

@@ -125,6 +125,7 @@ open class CardPresenter(
 private data class BaseRowItemDisplayConfig(
 	val image: JellyfinImage?,
 	val iconRes: Int,
+	val remoteImageUrl: String? = null,
 	val aspectRatio: Float,
 	val overrideShowInfo: Boolean? = null,
 	val scaleType: ImageView.ScaleType? = null,
@@ -150,6 +151,7 @@ private fun BaseRowItem.getDisplayConfig(imageType: ImageType, uniformAspect: Bo
 			},
 			image = getImage(imageType),
 			iconRes = R.drawable.ic_clapperboard,
+			remoteImageUrl = externalImageUrl,
 		)
 
 		when (baseItem?.type) {
@@ -288,6 +290,7 @@ private fun CardViewHolderContent(
 	if (item == null || displayConfig == null) return
 
 	val image = displayConfig.image
+	val remoteImageUrl = displayConfig.remoteImageUrl
 	val aspectRatio = displayConfig.aspectRatio.takeIf { it >= 0.1f }
 		?: image?.aspectRatio?.takeIf { it >= 0.1f } ?: 1f
 
@@ -302,15 +305,15 @@ private fun CardViewHolderContent(
 	val card = @Composable {
 		ItemCard(
 			image = {
-				if (image != null) {
+				if (image != null || remoteImageUrl != null) {
 					val api = koinInject<ApiClient>()
 					AsyncImage(
-						url = image.getUrl(
+						url = remoteImageUrl ?: image?.getUrl(
 							api,
 							maxWidth = with(localDensity) { size.width.roundToPx() },
 							maxHeight = with(localDensity) { size.height.roundToPx() },
 						),
-						blurHash = image.blurHash,
+						blurHash = image?.blurHash,
 						aspectRatio = aspectRatio,
 						scaleType = displayConfig.scaleType ?: ImageView.ScaleType.CENTER_CROP,
 						modifier = Modifier

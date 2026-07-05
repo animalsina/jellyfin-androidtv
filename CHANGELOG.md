@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.0.15 - 2026-07-06
+
+- Verificata la migrazione sul fork aggiornato: le personalizzazioni principali di SuperJelly risultano ancora presenti e la cronologia patch viene ricreata per questo pacchetto.
+- Le modifiche alle righe della home dalle impostazioni vengono applicate senza riavviare l’app: al salvataggio viene richiesta una ricostruzione immediata della home e, al ritorno, la lista viene riallineata alle preferenze aggiornate.
+- La vecchia riga dei provider esterni ora può mostrare un vero catalogo streaming gratuito: i contenuti Pluto TV VOD vengono letti da una playlist catalogo e appaiono come card della home con titolo, immagine remota e apertura del flusso quando disponibile.
+- Nelle schede di film e serie è disponibile l’azione “Dove guardarlo”, con ricerca online delle disponibilità e collegamenti mirati solo alle app provider rilevate sul dispositivo.
+- Migliorata la compatibilità Android 11+ per rilevare Pluto TV, RaiPlay, Prime Video e Netflix quando installati.
+
 ## v1.0.14 - 2026-07-05
 
 - La navigazione nella home è più fluida: i backdrop vengono caricati con debounce, dimensioni ridotte e salto dei caricamenti duplicati.

@@ -6,6 +6,7 @@ import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.auth.repository.UserRepository
 import org.jellyfin.androidtv.constant.ChangeTriggerType
+import org.jellyfin.androidtv.data.repository.ExternalCatalogRepository
 import org.jellyfin.androidtv.data.repository.ItemRepository
 import org.jellyfin.androidtv.ui.browsing.BrowseRowDef
 import org.jellyfin.sdk.model.api.BaseItemDto
@@ -19,6 +20,7 @@ import org.jellyfin.sdk.model.api.request.GetResumeItemsRequest
 class HomeFragmentHelper(
 	private val context: Context,
 	private val userRepository: UserRepository,
+	private val externalCatalogRepository: ExternalCatalogRepository,
 ) {
 	suspend fun loadRecentlyAdded(userViews: Collection<BaseItemDto>): HomeFragmentRow =
 		withContext(Dispatchers.IO) {
@@ -159,7 +161,9 @@ class HomeFragmentHelper(
 			HomeFragmentMoodRow.short(userViews)
 		}
 
-	fun loadExternalProviders(): HomeFragmentRow = HomeFragmentExternalProvidersRow()
+	suspend fun loadExternalProviders(): HomeFragmentRow = withContext(Dispatchers.IO) {
+		HomeFragmentExternalProvidersRow(externalCatalogRepository.loadHomeCatalog())
+	}
 
 
 	companion object {

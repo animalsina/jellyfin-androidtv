@@ -255,7 +255,10 @@ class HomeFragmentNetflixStyle : Fragment() {
 			else -> null
 		}
 
-		if (backdropImage != null) {
+		val externalBackdropUrl = item.externalBackdropUrl
+		if (!externalBackdropUrl.isNullOrBlank()) {
+			loadPreviewBackdrop(externalBackdropUrl, blurHash = null, itemId = nextItemId)
+		} else if (backdropImage != null) {
 			val backdropWidth = resources.getDimensionPixelSize(R.dimen.home_preview_width)
 			val backdropHeight = resources.getDimensionPixelSize(R.dimen.home_preview_width) * 3 / 4
 			val backdropUrl = backdropImage.getUrl(api, fillWidth = backdropWidth, fillHeight = backdropHeight)
@@ -282,7 +285,7 @@ class HomeFragmentNetflixStyle : Fragment() {
 		updateMetadata(baseItem)
 		previewPoster.visibility = View.GONE
 
-		if (isTrailerEnabled() && TRAILER_TYPES.contains(baseItem.type) && !isTrailerBackoffActive()) {
+		if (isTrailerEnabled() && item !is org.jellyfin.androidtv.ui.itemhandling.ExternalCatalogBaseRowItem && TRAILER_TYPES.contains(baseItem.type) && !isTrailerBackoffActive()) {
 			playYouTubeTrailerWithDelay(item, nextItemId)
 		}
 	}
