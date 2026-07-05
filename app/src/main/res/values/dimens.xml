@@ -13,6 +13,7 @@
 
     <!-- Home screen preview section -->
     <dimen name="home_preview_height">200dp</dimen>
+    <dimen name="home_preview_width">600dp</dimen>
     
     <!-- Netflix-style row spacing -->
     <dimen name="lb_browse_rows_margin_top">0dp</dimen>

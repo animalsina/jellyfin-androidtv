@@ -9,6 +9,7 @@ import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.ui.card.LegacyImageCardView
 import org.jellyfin.androidtv.ui.itemhandling.BaseRowItem
 import org.jellyfin.androidtv.util.ImageHelper
+import org.jellyfin.androidtv.util.TouchNavigationHelper
 import org.jellyfin.androidtv.util.apiclient.itemImages
 import org.jellyfin.sdk.model.api.ImageType
 import org.koin.core.component.KoinComponent
@@ -49,8 +50,10 @@ class UserViewCardPresenter(
 
 	override fun onCreateViewHolder(parent: ViewGroup): ViewHolder {
 		val cardView = LegacyImageCardView(parent.context, true)
-		cardView.isFocusable = true
-		cardView.isFocusableInTouchMode = true
+		val touchHomeNavigation = TouchNavigationHelper.shouldUseTouchHomeNavigation(parent.context)
+		cardView.isFocusable = !touchHomeNavigation
+		cardView.isFocusableInTouchMode = !touchHomeNavigation
+		cardView.isClickable = true
 
 		val typedValue = TypedValue()
 		val theme = parent.context.theme

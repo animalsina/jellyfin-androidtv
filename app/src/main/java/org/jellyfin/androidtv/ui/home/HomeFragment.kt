@@ -12,6 +12,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
@@ -32,6 +33,7 @@ import org.jellyfin.androidtv.data.repository.NotificationsRepository
 import org.jellyfin.androidtv.ui.base.JellyfinTheme
 import org.jellyfin.androidtv.ui.shared.toolbar.MainToolbar
 import org.jellyfin.androidtv.ui.shared.toolbar.MainToolbarActiveButton
+import org.jellyfin.androidtv.util.TouchNavigationHelper
 import org.koin.android.ext.android.inject
 
 class HomeFragment : Fragment() {
@@ -44,8 +46,12 @@ class HomeFragment : Fragment() {
 		container: ViewGroup?,
 		savedInstanceState: Bundle?
 	) = content {
+		val context = LocalContext.current
+		val useTouchHomeNavigation = remember(context) { TouchNavigationHelper.shouldUseTouchHomeNavigation(context) }
 		val rowsFocusRequester = remember { FocusRequester() }
-		LaunchedEffect(rowsFocusRequester) { rowsFocusRequester.requestFocus() }
+		LaunchedEffect(rowsFocusRequester, useTouchHomeNavigation) {
+			if (!useTouchHomeNavigation) rowsFocusRequester.requestFocus()
+		}
 
 		JellyfinTheme {
 			Column {
@@ -55,8 +61,10 @@ class HomeFragment : Fragment() {
 				// issue we add custom behavior that only allows focus exit when the current selected row is the first one. Additionally when
 				// we do switch the focus, we reset the leanback state so it won't cause weird behavior when focus is regained
 				var rowsSupportFragment by remember { mutableStateOf<HomeRowsFragment?>(null) }
-				AndroidFragment<HomeRowsFragment>(
-					modifier = Modifier
+				val rowsModifier = if (useTouchHomeNavigation) {
+					Modifier.fillMaxSize()
+				} else {
+					Modifier
 						.focusGroup()
 						.focusRequester(rowsFocusRequester)
 						.focusProperties {
@@ -70,7 +78,11 @@ class HomeFragment : Fragment() {
 								}
 							}
 						}
-						.fillMaxSize(),
+						.fillMaxSize()
+				}
+
+				AndroidFragment<HomeRowsFragment>(
+					modifier = rowsModifier,
 					onUpdate = { fragment ->
 						rowsSupportFragment = fragment
 					}

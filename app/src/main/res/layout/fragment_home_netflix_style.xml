@@ -254,11 +254,6 @@
         android:paddingTop="86dp"
         android:paddingBottom="24dp"
         android:clipToPadding="false"
-        android:descendantFocusability="afterDescendants"
-        android:focusable="true"
-        android:focusableInTouchMode="true">
-
-        <requestFocus />
-    </androidx.fragment.app.FragmentContainerView>
+        android:descendantFocusability="afterDescendants" />
 
 </RelativeLayout>

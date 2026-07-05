@@ -2,6 +2,7 @@ package org.jellyfin.androidtv.ui.home
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.LruCache
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -30,6 +31,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
+import okhttp3.Call
 import okhttp3.Request
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.auth.repository.ServerRepository
@@ -59,9 +61,8 @@ import org.koin.android.ext.android.get
 import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.activityViewModel
 import timber.log.Timber
-import java.net.HttpURLConnection
-import java.net.URL
 import java.net.URLEncoder
+import java.util.concurrent.TimeUnit
 
 
 class HomeFragmentNetflixStyle : Fragment() {
@@ -94,13 +95,35 @@ class HomeFragmentNetflixStyle : Fragment() {
 	private lateinit var trailerWebView: WebView
 	private lateinit var trailerGradientOverlay: View
 
-	private val trailerCache = mutableMapOf<String, String>()
+	private val trailerCache = object : LruCache<String, String>(MAX_TRAILER_CACHE_ITEMS) {}
+	private val trailerMissCache = object : LruCache<String, Boolean>(MAX_TRAILER_MISS_CACHE_ITEMS) {}
+	private val trailerHttpClient = OkHttpClient.Builder()
+		.callTimeout(TRAILER_NETWORK_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+		.connectTimeout(TRAILER_NETWORK_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+		.readTimeout(TRAILER_NETWORK_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+		.build()
 	private var trailerJob: Job? = null
 	private var trailerHideJob: Job? = null
+	private var trailerSearchCall: Call? = null
+	private var trailerCheckCall: Call? = null
+	private var currentPreviewItemId: String? = null
+	private var currentBackdropUrl: String? = null
+	private var currentTrailerVideoId: String? = null
+	private var trailerFailures = 0
+	private var trailersDisabledUntil = 0L
 
 	companion object {
 		private val TRAILER_TYPES =
 			setOf(BaseItemKind.SERIES, BaseItemKind.EPISODE, BaseItemKind.MOVIE, BaseItemKind.SEASON, BaseItemKind.VIDEO)
+		private const val TRAILER_START_DELAY_MS = 2_800L
+		private const val TRAILER_MAX_DURATION_MS = 45_000L
+		private const val TRAILER_FADE_OUT_MS = 250L
+		private const val TRAILER_NETWORK_TIMEOUT_MS = 4_000L
+		private const val TRAILER_ERROR_BACKOFF_MS = 120_000L
+		private const val TRAILER_MAX_CONSECUTIVE_FAILURES = 3
+		private const val MAX_TRAILER_CACHE_ITEMS = 80
+		private const val MAX_TRAILER_MISS_CACHE_ITEMS = 120
+		private val YOUTUBE_ID_REGEX = """(?:v=|/embed/|youtu\.be/|/shorts/)([a-zA-Z0-9_-]{11})""".toRegex()
 	}
 
 	override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
@@ -133,6 +156,9 @@ class HomeFragmentNetflixStyle : Fragment() {
 			settings.mediaPlaybackRequiresUserGesture = false
 			settings.domStorageEnabled = true
 			settings.javaScriptEnabled = true
+			settings.loadsImagesAutomatically = true
+			settings.setSupportMultipleWindows(false)
+			setBackgroundColor(android.graphics.Color.TRANSPARENT)
 		}
 
 		// Setup glassmorphic toolbar
@@ -155,8 +181,29 @@ class HomeFragmentNetflixStyle : Fragment() {
 			}
 			.launchIn(viewLifecycleOwner.lifecycleScope)
 
+		configureHomeContainerFocusForDevice()
+
 		// Set up communication with HomeRowsFragment
 		setupRowsFragmentListener()
+	}
+
+	private fun configureHomeContainerFocusForDevice() {
+		val useTouchHomeNavigation = org.jellyfin.androidtv.util.TouchNavigationHelper.shouldUseTouchHomeNavigation(requireContext())
+		if (useTouchHomeNavigation) {
+			// On phones/tablets the XML-level requestFocus/focusable container makes Leanback keep
+			// restoring its selected row while the user performs normal touch scrolling. The rows
+			// fragment remains fully touchable/clickable, but it must not own TV focus on mobile.
+			contentView.isFocusable = false
+			contentView.isFocusableInTouchMode = false
+			contentView.descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
+			contentView.clearFocus()
+			view?.clearFocus()
+		} else {
+			contentView.isFocusable = true
+			contentView.isFocusableInTouchMode = true
+			contentView.descendantFocusability = ViewGroup.FOCUS_AFTER_DESCENDANTS
+			contentView.post { contentView.requestFocus() }
+		}
 	}
 
 	private fun setupRowsFragmentListener() {
@@ -171,58 +218,59 @@ class HomeFragmentNetflixStyle : Fragment() {
 
 	fun updatePreviewSection(item: BaseRowItem?) {
 		resetTrailerTimer()
-		resetTrailer()
 		cancelTrailerHide()
 
 		if (item == null || item.baseItem == null) {
-			// Hide and clear preview when no item is selected
 			resetPreview()
 			return
 		}
 
 		val baseItem = item.baseItem
+		val nextItemId = baseItem.id.toString()
+		val changedItem = currentPreviewItemId != nextItemId
+		currentPreviewItemId = nextItemId
 
-		// Update background image
+		if (changedItem) {
+			// Non svuotiamo subito la WebView mentre si scorre: è la causa principale dei micro-blocchi.
+			// La nascondiamo e lasciamo che il nuovo trailer parta solo se la selezione resta stabile.
+			hideTrailerForSelectionChange()
+		}
+
 		val backdropImage = when {
-			// First try item's own backdrops
 			baseItem.itemBackdropImages.isNotEmpty() -> baseItem.itemBackdropImages.firstOrNull()
 			baseItem.itemImages[ImageType.BACKDROP] != null -> baseItem.itemImages[ImageType.BACKDROP]
-			// For episodes, try parent backdrops
 			baseItem.parentBackdropImages.isNotEmpty() -> baseItem.parentBackdropImages.firstOrNull()
-			// For episodes, use primary image (screenshot) as fallback
 			baseItem.type == BaseItemKind.EPISODE && baseItem.itemImages[ImageType.PRIMARY] != null ->
 				baseItem.itemImages[ImageType.PRIMARY]
-			// Last resort: try series thumb
 			baseItem.type == BaseItemKind.EPISODE && baseItem.seriesThumbImage != null ->
 				baseItem.seriesThumbImage
-
 			else -> null
 		}
 
 		if (backdropImage != null) {
 			val backdropUrl = imageHelper.getImageUrl(backdropImage)
-
-			// Load image with a callback to show views only after loading
-			previewBackground.doOnAttach {
-				it.findViewTreeLifecycleOwner()?.lifecycleScope?.launch {
-					// Load the image first
-					previewBackground.load(backdropUrl, blurHash = null) // No blur hash to avoid placeholder
-					// Then show both views
-					previewBackground.visibility = View.VISIBLE
-					previewGradient.visibility = View.VISIBLE
+			if (currentBackdropUrl != backdropUrl) {
+				currentBackdropUrl = backdropUrl
+				previewBackground.doOnAttach {
+					it.findViewTreeLifecycleOwner()?.lifecycleScope?.launch {
+						previewBackground.load(backdropUrl, blurHash = null)
+						previewBackground.visibility = View.VISIBLE
+						previewGradient.visibility = View.VISIBLE
+					}
 				}
+			} else {
+				previewBackground.visibility = View.VISIBLE
+				previewGradient.visibility = View.VISIBLE
 			}
 		} else {
-			// Hide background when no backdrop is available
+			currentBackdropUrl = null
 			previewBackground.visibility = View.GONE
 			previewGradient.visibility = View.GONE
 			previewBackground.setImageDrawable(null)
 		}
 
-		// Update title
 		previewTitle.text = baseItem.name
 
-		// Sottotitolo solo se episodio
 		if (baseItem.type == BaseItemKind.EPISODE) {
 			previewSubtitle.text = baseItem.seriesName ?: ""
 			previewSubtitle.visibility = View.VISIBLE
@@ -231,19 +279,12 @@ class HomeFragmentNetflixStyle : Fragment() {
 			previewSubtitle.visibility = View.GONE
 		}
 
-		// Update description
 		previewDescription.text = baseItem.overview ?: ""
-
-		// Update metadata
 		updateMetadata(baseItem)
-
-		// Keep poster hidden - don't show the card on top right
 		previewPoster.visibility = View.GONE
 
-		if (isTrailerEnabled()) {
-			if (TRAILER_TYPES.contains(item.baseItem.type)) {
-				playYouTubeTrailerWithDelay(item)
-			}
+		if (isTrailerEnabled() && TRAILER_TYPES.contains(baseItem.type) && !isTrailerBackoffActive()) {
+			playYouTubeTrailerWithDelay(item, nextItemId)
 		}
 	}
 
@@ -571,38 +612,60 @@ class HomeFragmentNetflixStyle : Fragment() {
 		}
 	}
 
-	private fun playYouTubeTrailer(item: BaseRowItem) {
+	private fun playYouTubeTrailer(item: BaseRowItem, expectedItemId: String) {
 		val baseItem = item.baseItem ?: return
 		val itemId = baseItem.id.toString()
+		if (itemId != expectedItemId || itemId != currentPreviewItemId) return
+		if (trailerMissCache.get(itemId) == true) return
 
-		if (trailerCache.containsKey(itemId)) {
-			startTrailer(trailerCache[itemId]!!)
-		} else {
-			var trailerName = "${baseItem.name}[Movie]"
-			if (baseItem.type == BaseItemKind.EPISODE) {
-				trailerName = "${baseItem.seriesName}[Series] "
-			}
+		val cachedVideoId = trailerCache.get(itemId)
+		if (!cachedVideoId.isNullOrBlank()) {
+			startTrailer(cachedVideoId, itemId)
+			return
+		}
 
-			trailerName = trailerName + " (${baseItem.productionYear}) official trailer"
-			if (baseItem.tags != null) {
-				trailerName = trailerName + " " + baseItem.tags?.joinToString(" ")
-			}
+		val metadataTrailerId = baseItem.remoteTrailers.orEmpty()
+			.asSequence()
+			.mapNotNull { it.url }
+			.mapNotNull(::extractYouTubeVideoId)
+			.firstOrNull()
 
-			Timber.d("Fetching trailer for $trailerName")
+		if (!metadataTrailerId.isNullOrBlank()) {
+			trailerCache.put(itemId, metadataTrailerId)
+			startTrailer(metadataTrailerId, itemId)
+			return
+		}
 
-			fetchTrailerFromYouTube(trailerName) { videoId ->
-				if (videoId.isNotEmpty()) {
-					trailerCache[itemId] = videoId
-					startTrailer(videoId)
-				} else {
-					Timber.w("No trailer found for $trailerName")
-				}
+		val trailerName = buildTrailerSearchQuery(baseItem)
+		Timber.d("Fetching trailer for $trailerName")
+
+		fetchTrailerFromYouTube(itemId, trailerName) { videoId ->
+			if (itemId != currentPreviewItemId) return@fetchTrailerFromYouTube
+			if (videoId.isNotEmpty()) {
+				trailerCache.put(itemId, videoId)
+				startTrailer(videoId, itemId)
+			} else {
+				trailerMissCache.put(itemId, true)
+				Timber.w("No trailer found for $trailerName")
 			}
 		}
 	}
 
-	private fun startTrailer(videoId: String) {
-		val width = previewBackground.width
+	private fun buildTrailerSearchQuery(baseItem: BaseItemDto): String {
+		val title = if (baseItem.type == BaseItemKind.EPISODE) baseItem.seriesName ?: baseItem.name else baseItem.name
+		val type = if (baseItem.type == BaseItemKind.SERIES || baseItem.type == BaseItemKind.EPISODE) "Series" else "Movie"
+		val year = baseItem.productionYear?.let { " ($it)" }.orEmpty()
+		return "$title [$type]$year official trailer"
+	}
+
+	private fun extractYouTubeVideoId(url: String): String? = YOUTUBE_ID_REGEX.find(url)?.groups?.get(1)?.value
+
+	private fun startTrailer(videoId: String, itemId: String) {
+		if (itemId != currentPreviewItemId) return
+		if (currentTrailerVideoId == videoId && trailerContainer.isVisible) return
+
+		currentTrailerVideoId = videoId
+		val width = previewBackground.width.takeIf { it > 0 } ?: resources.getDimensionPixelSize(R.dimen.home_preview_width)
 		val height = (width * 9) / 16
 		trailerContainer.layoutParams.width = width
 		trailerContainer.layoutParams.height = height
@@ -612,20 +675,22 @@ class HomeFragmentNetflixStyle : Fragment() {
 		trailerContainer.alpha = 0f
 		trailerGradientOverlay.visibility = View.VISIBLE
 
-		val embedUrl = "https://www.youtube.com/embed/$videoId?autoplay=1&mute=1&controls=0&rel=0&modestbranding=1"
+		val embedUrl = "https://www.youtube.com/embed/$videoId?autoplay=1&mute=1&controls=0&rel=0&modestbranding=1&playsinline=1"
 
 		trailerWebView.webViewClient = object : WebViewClient() {
 			override fun onPageFinished(view: WebView?, url: String?) {
 				super.onPageFinished(view, url)
-
-				if (!isAdded || getView() == null || !isVisible) return
+				if (!isAdded || getView() == null || !isVisible || itemId != currentPreviewItemId) return
 
 				viewLifecycleOwner.lifecycleScope.launch {
-					delay(1200)
-					trailerContainer.animate()
-						.alpha(1f)
-						.setDuration(300)
-						.start()
+					delay(900)
+					if (isAdded && itemId == currentPreviewItemId) {
+						trailerFailures = 0
+						trailerContainer.animate()
+							.alpha(1f)
+							.setDuration(250)
+							.start()
+					}
 				}
 			}
 
@@ -636,7 +701,8 @@ class HomeFragmentNetflixStyle : Fragment() {
 			) {
 				super.onReceivedError(view, request, error)
 				Timber.w("Errore caricamento trailer: ${error?.description}")
-				resetTrailer()
+				registerTrailerFailure()
+				resetTrailer(clearWebView = true)
 			}
 
 			override fun onReceivedHttpError(
@@ -646,51 +712,33 @@ class HomeFragmentNetflixStyle : Fragment() {
 			) {
 				super.onReceivedHttpError(view, request, errorResponse)
 				Timber.w("HTTP error loading trailer: ${errorResponse?.statusCode}")
-				resetTrailer()
+				registerTrailerFailure()
+				resetTrailer(clearWebView = true)
 			}
 		}
 
 		val html = """
-        <html>
-        <head>
-            <style>
-                body, html {
-                    margin: 0;
-                    padding: 0;
-                    height: 100%;
-                    overflow: hidden;
-                    background: black;
-                }
-                iframe {
-                    position: absolute;
-                    top: 0;
-                    left: 0;
-                    width: 100%;
-                    height: 100%;
-                    object-fit: cover;
-                }
-            </style>
-        </head>
-        <body>
-            <iframe src="$embedUrl" frameborder="0" allowfullscreen allow="autoplay"></iframe>
-        </body>
-        </html>
-    """.trimIndent()
+	        <html>
+	        <head>
+	            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+	            <style>
+	                body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background: black; }
+	                iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+	            </style>
+	        </head>
+	        <body>
+	            <iframe src="$embedUrl" frameborder="0" allow="autoplay; encrypted-media"></iframe>
+	        </body>
+	        </html>
+	    """.trimIndent()
 
-		trailerWebView.loadData(html, "text/html", "utf-8")
+		trailerWebView.loadDataWithBaseURL("https://www.youtube.com", html, "text/html", "utf-8", null)
 
 		trailerHideJob?.cancel()
 		trailerHideJob = viewLifecycleOwner.lifecycleScope.launch {
-			delay(120_000)
-			if (isAdded && trailerContainer.isVisible) {
-				trailerContainer.animate()
-					.alpha(0f)
-					.setDuration(800)
-					.withEndAction {
-						trailerContainer.visibility = View.GONE
-						trailerWebView.loadUrl("about:blank")
-					}
-					.start()
+			delay(TRAILER_MAX_DURATION_MS)
+			if (isAdded && trailerContainer.isVisible && itemId == currentPreviewItemId) {
+				resetTrailer(clearWebView = true)
 			}
 		}
 	}
@@ -701,43 +749,53 @@ class HomeFragmentNetflixStyle : Fragment() {
 		trailerHideJob = null
 	}
 
-	private fun fetchTrailerFromYouTube(query: String, callback: (String) -> Unit) {
+	private fun fetchTrailerFromYouTube(itemId: String, query: String, callback: (String) -> Unit) {
 		viewLifecycleOwner.lifecycleScope.launch {
 			try {
 				val videoId = withContext(Dispatchers.IO) {
 					val encodedQuery = URLEncoder.encode(query, "UTF-8")
 					val searchUrl = "https://www.youtube.com/results?search_query=$encodedQuery"
-
-					val client = OkHttpClient()
 					val request = Request.Builder()
 						.url(searchUrl)
-						.header("User-Agent", "Mozilla/5.0")
+						.header("User-Agent", "Mozilla/5.0 (Android TV; SuperJellyTV)")
 						.build()
 
-					val res = client.newCall(request).execute()
-					val body = res.body?.string().orEmpty()
+					trailerSearchCall?.cancel()
+					val call = trailerHttpClient.newCall(request)
+					trailerSearchCall = call
+					val response = call.execute()
+					response.use { res ->
+						if (!res.isSuccessful) return@withContext ""
+						val body = res.body?.string().orEmpty()
+						"""/watch\?v=([a-zA-Z0-9_-]{11})""".toRegex().find(body)?.groups?.get(1)?.value.orEmpty()
+					}
+				}
 
-					val regex = """/watch\?v=([a-zA-Z0-9_-]{11})""".toRegex()
-					regex.find(body)?.groups?.get(1)?.value.orEmpty()
+				if (itemId != currentPreviewItemId || videoId.isBlank()) {
+					callback("")
+					return@launch
 				}
 
 				if (!checkedAllowedYoutubeVideo("https://www.youtube.com/watch?v=$videoId")) {
-					throw Exception("Not allowed video")
+					callback("")
+					return@launch
 				}
 
 				callback(videoId)
 			} catch (e: Exception) {
+				registerTrailerFailure()
 				Timber.w(e, "Failed to fetch YouTube trailer")
 				callback("")
 			}
 		}
 	}
 
-	private fun resetPreview() {
-		trailerWebView.loadUrl("about:blank")
-		trailerContainer.visibility = View.GONE
 
-		// Nascondi anche il resto della preview
+	private fun resetPreview() {
+		currentPreviewItemId = null
+		currentBackdropUrl = null
+		resetTrailer(clearWebView = true)
+
 		previewBackground.visibility = View.GONE
 		previewGradient.visibility = View.GONE
 		previewBackground.setImageDrawable(null)
@@ -751,21 +809,42 @@ class HomeFragmentNetflixStyle : Fragment() {
 		resetTrailerTimer()
 	}
 
-	private fun resetTrailer() {
-		trailerJob?.cancel()
-		trailerWebView.stopLoading()
-		trailerWebView.loadUrl("about:blank")
-		trailerContainer.visibility = View.GONE
+	private fun hideTrailerForSelectionChange() {
+		trailerSearchCall?.cancel()
+		trailerCheckCall?.cancel()
+		currentTrailerVideoId = null
+		trailerContainer.animate().cancel()
 		trailerContainer.alpha = 0f
+		trailerContainer.visibility = View.GONE
 		trailerGradientOverlay.visibility = View.GONE
 	}
 
-	fun playYouTubeTrailerWithDelay(item: BaseRowItem) {
-		trailerJob = viewLifecycleOwner.lifecycleScope.launch {
-			delay(2000)
+	private fun resetTrailer(clearWebView: Boolean = false) {
+		trailerJob?.cancel()
+		trailerSearchCall?.cancel()
+		trailerCheckCall?.cancel()
+		trailerContainer.animate().cancel()
+		trailerContainer.animate()
+			.alpha(0f)
+			.setDuration(TRAILER_FADE_OUT_MS)
+			.withEndAction {
+				trailerContainer.visibility = View.GONE
+				trailerGradientOverlay.visibility = View.GONE
+				if (clearWebView) {
+					currentTrailerVideoId = null
+					trailerWebView.stopLoading()
+					trailerWebView.loadUrl("about:blank")
+				}
+			}
+			.start()
+	}
 
-			if (isAdded && isVisible) {
-				playYouTubeTrailer(item)
+	fun playYouTubeTrailerWithDelay(item: BaseRowItem, expectedItemId: String) {
+		trailerJob = viewLifecycleOwner.lifecycleScope.launch {
+			delay(TRAILER_START_DELAY_MS)
+
+			if (isAdded && isVisible && expectedItemId == currentPreviewItemId && !isTrailerBackoffActive()) {
+				playYouTubeTrailer(item, expectedItemId)
 			}
 		}
 	}
@@ -778,21 +857,48 @@ class HomeFragmentNetflixStyle : Fragment() {
 
 	suspend fun checkedAllowedYoutubeVideo(videoUrl: String): Boolean = withContext(Dispatchers.IO) {
 		try {
-			val apiUrl = "https://www.youtube.com/oembed?url=$videoUrl&format=json"
-
-			val connection = URL(apiUrl).openConnection() as HttpURLConnection
-			connection.requestMethod = "GET"
-			connection.connectTimeout = 5000
-			connection.readTimeout = 5000
-
-			val code = connection.responseCode
-			connection.disconnect()
-
-			code == HttpURLConnection.HTTP_OK
+			val apiUrl = "https://www.youtube.com/oembed?url=${URLEncoder.encode(videoUrl, "UTF-8")}&format=json"
+			val request = Request.Builder()
+				.url(apiUrl)
+				.header("User-Agent", "Mozilla/5.0 (Android TV; SuperJellyTV)")
+				.build()
+			trailerCheckCall?.cancel()
+			val call = trailerHttpClient.newCall(request)
+			trailerCheckCall = call
+			call.execute().use { it.isSuccessful }
 		} catch (e: Exception) {
 			Timber.e(e, "Failed to check YouTube video")
 			false
 		}
+	}
+
+	private fun registerTrailerFailure() {
+		trailerFailures++
+		if (trailerFailures >= TRAILER_MAX_CONSECUTIVE_FAILURES) {
+			trailersDisabledUntil = System.currentTimeMillis() + TRAILER_ERROR_BACKOFF_MS
+			Timber.w("Trailer preview paused temporarily after repeated failures")
+		}
+	}
+
+	private fun isTrailerBackoffActive(): Boolean {
+		val active = System.currentTimeMillis() < trailersDisabledUntil
+		if (!active && trailersDisabledUntil != 0L) {
+			trailersDisabledUntil = 0L
+			trailerFailures = 0
+		}
+		return active
+	}
+
+	override fun onDestroyView() {
+		resetTrailerTimer()
+		cancelTrailerHide()
+		trailerSearchCall?.cancel()
+		trailerCheckCall?.cancel()
+		if (::trailerWebView.isInitialized) {
+			trailerWebView.stopLoading()
+			trailerWebView.loadUrl("about:blank")
+		}
+		super.onDestroyView()
 	}
 
 	private fun isTrailerEnabled(): Boolean {

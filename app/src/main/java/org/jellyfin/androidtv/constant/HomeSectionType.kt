@@ -30,5 +30,9 @@ enum class HomeSectionType(
 	GENRE_RANDOM_MOVIES("genrerandommovies", R.string.home_section_genre_random_movies),
 	GENRE_RANDOM_TV("genrerandomtv", R.string.home_section_genre_random_tv),
 	GENRE_RANDOM_MIXED("genrerandommixed", R.string.home_section_genre_random_mixed),
+	MOOD_LIGHT("moodlight", R.string.home_section_mood_light),
+	MOOD_ACTION("moodaction", R.string.home_section_mood_action),
+	MOOD_SHORT("moodshort", R.string.home_section_mood_short),
+	EXTERNAL_PROVIDERS("externalproviders", R.string.home_section_external_providers),
 	NONE("none", R.string.home_section_none),
 }

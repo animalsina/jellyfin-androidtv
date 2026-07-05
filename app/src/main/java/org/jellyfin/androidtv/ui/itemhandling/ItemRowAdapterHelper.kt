@@ -41,6 +41,7 @@ import org.jellyfin.sdk.model.api.request.GetSeasonsRequest
 import org.jellyfin.sdk.model.api.request.GetSimilarItemsRequest
 import org.jellyfin.sdk.model.api.request.GetUpcomingEpisodesRequest
 import timber.log.Timber
+import kotlin.math.max
 import kotlin.math.min
 
 fun <T : Any> ItemRowAdapter.setItems(
@@ -49,27 +50,46 @@ fun <T : Any> ItemRowAdapter.setItems(
 ) {
 	Timber.d("Creating items from $itemsLoaded existing and ${items.size} new, adapter size is ${size()}")
 
-	val allItems = buildList {
-		// Add current items before loaded items
-		repeat(itemsLoaded) {
-			add(this@setItems.get(it))
-		}
-
-		// Add loaded items
-		val mappedItems = items.mapIndexedNotNull { index, item ->
-			transform(item, itemsLoaded + index)
-		}
-		mappedItems.forEach { add(it) }
-
-		// Add current items after loaded items
-		repeat(min(totalItems, size()) - itemsLoaded - mappedItems.size) {
-			add(this@setItems.get(it + itemsLoaded + mappedItems.size))
-		}
+	val existingItems = (0 until size()).mapNotNull { get(it) as? BaseRowItem }
+	val safeLoadedCount = itemsLoaded.coerceIn(0, existingItems.size)
+	val mappedItems = items.mapIndexedNotNull { index, item ->
+		transform(item, safeLoadedCount + index)
 	}
 
-	replaceAll(allItems)
+	val allItems = buildList<BaseRowItem> {
+		// Keep the currently visible prefix intact. Reusing the same object instances avoids Leanback
+		// treating the entire carousel as a new list while the user is scrolling on touch/mobile devices.
+		addAll(existingItems.take(safeLoadedCount))
+
+		// Add the newly retrieved page.
+		addAll(mappedItems)
+
+		// Preserve any already materialized items after the refreshed window. The old formula could become
+		// negative during paged loads and the full replaceAll diff could make a row jump back to the start.
+		val remainingExisting = max(0, min(totalItems, existingItems.size) - safeLoadedCount - mappedItems.size)
+		addAll(existingItems.drop(safeLoadedCount + mappedItems.size).take(remainingExisting))
+	}
+
+	replaceAll(
+		allItems,
+		areItemsTheSame = { old, new ->
+			old.stableRowIdentity() == new.stableRowIdentity()
+		},
+		areContentsTheSame = { old, new ->
+			old.stableRowIdentity() == new.stableRowIdentity() && old.getClassSafeName() == new.getClassSafeName()
+		},
+	)
 	itemsLoaded = allItems.size
 }
+
+private fun Any.stableRowIdentity(): String = when (this) {
+	is BaseItemDtoBaseRowItem -> "item:${itemId}"
+	is GridButtonBaseRowItem -> "button:${gridButton.id}:${gridButton.text}"
+	is BaseRowItem -> "${baseRowType}:${itemId ?: getClassSafeName()}"
+	else -> "${getClassSafeName()}:${hashCode()}"
+}
+
+private fun Any.getClassSafeName(): String = javaClass.name
 
 fun ItemRowAdapter.retrieveResumeItems(api: ApiClient, query: GetResumeItemsRequest) {
 	ProcessLifecycleOwner.get().lifecycleScope.launch {

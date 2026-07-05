@@ -22,6 +22,7 @@ import org.jellyfin.androidtv.ui.itemhandling.AudioQueueBaseRowItem;
 import org.jellyfin.androidtv.ui.itemhandling.BaseRowItem;
 import org.jellyfin.androidtv.ui.itemhandling.BaseRowType;
 import org.jellyfin.androidtv.util.ImageHelper;
+import org.jellyfin.androidtv.util.TouchNavigationHelper;
 import org.jellyfin.androidtv.util.apiclient.JellyfinImage;
 import org.jellyfin.androidtv.util.apiclient.JellyfinImageKt;
 import org.jellyfin.sdk.model.api.BaseItemDto;
@@ -222,8 +223,10 @@ public class CardPresenter extends Presenter {
     @Override
     public ViewHolder onCreateViewHolder(ViewGroup parent) {
         LegacyImageCardView cardView = new LegacyImageCardView(parent.getContext(), mShowInfo);
-        cardView.setFocusable(true);
-        cardView.setFocusableInTouchMode(true);
+        boolean touchHomeNavigation = TouchNavigationHelper.shouldUseTouchHomeNavigation(parent.getContext());
+        cardView.setFocusable(!touchHomeNavigation);
+        cardView.setFocusableInTouchMode(!touchHomeNavigation);
+        cardView.setClickable(true);
 
         TypedValue typedValue = new TypedValue();
         Resources.Theme theme = parent.getContext().getTheme();

@@ -144,6 +144,23 @@ class HomeFragmentHelper(
 			HomeFragmentGenreRow.createMixedGenreRow(userViews)
 		}
 
+	suspend fun loadMoodLight(userViews: Collection<BaseItemDto>): HomeFragmentRow =
+		withContext(Dispatchers.IO) {
+			HomeFragmentMoodRow.light(userViews)
+		}
+
+	suspend fun loadMoodAction(userViews: Collection<BaseItemDto>): HomeFragmentRow =
+		withContext(Dispatchers.IO) {
+			HomeFragmentMoodRow.action(userViews)
+		}
+
+	suspend fun loadMoodShort(userViews: Collection<BaseItemDto>): HomeFragmentRow =
+		withContext(Dispatchers.IO) {
+			HomeFragmentMoodRow.short(userViews)
+		}
+
+	fun loadExternalProviders(): HomeFragmentRow = HomeFragmentExternalProvidersRow()
+
 
 	companion object {
 		// Maximum amount of items loaded for a row
