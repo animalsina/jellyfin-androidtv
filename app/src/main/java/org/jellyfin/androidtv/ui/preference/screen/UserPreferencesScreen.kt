@@ -3,8 +3,10 @@ package org.jellyfin.androidtv.ui.preference.screen
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.ui.preference.category.aboutCategory
 import org.jellyfin.androidtv.ui.preference.dsl.OptionsFragment
+import org.jellyfin.androidtv.ui.preference.dsl.action
 import org.jellyfin.androidtv.ui.preference.dsl.link
 import org.jellyfin.androidtv.ui.preference.dsl.optionsScreen
+import org.jellyfin.androidtv.update.ApkUpdateManager
 
 class UserPreferencesScreen : OptionsFragment() {
 	override val screen by optionsScreen {
@@ -44,6 +46,15 @@ class UserPreferencesScreen : OptionsFragment() {
 				setContent(R.string.pref_developer_link_description)
 				icon = R.drawable.ic_flask
 				withFragment<DeveloperPreferencesScreen>()
+			}
+		}
+
+		category {
+			action {
+				setTitle(R.string.pref_check_apk_updates)
+				setContent(R.string.pref_check_apk_updates_description)
+				icon = R.drawable.ic_update
+				onActivate = { ApkUpdateManager(requireActivity()).checkForUpdates(force = true) }
 			}
 		}
 

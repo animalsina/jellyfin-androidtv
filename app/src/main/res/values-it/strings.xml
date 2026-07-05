@@ -292,7 +292,7 @@
     <string name="lbl_remove_users">Questo rimuoverà anche tutti gli utenti associati</string>
     <string name="lbl_manage_servers">Gestisci i server</string>
     <string name="pref_default_rating">Tipo di rating preferito</string>
-    <string name="login_help_description">Jellyfin ha bisogno di un server a cui connettersi. Visita la nostra documentazione su docs.jellyfin.org o scansiona il codice QR per iniziare con Jellyfin.</string>
+    <string name="login_help_description">SuperJelly ha bisogno di un server Jellyfin a cui connettersi. Visita la nostra documentazione su docs.jellyfin.org o scansiona il codice QR per iniziare con Jellyfin.</string>
     <string name="login_help_title">Hai bisogno d\'aiuto\?</string>
     <string name="connect_manually_by_address">Inserisci l\'indirizzo del server</string>
     <string name="discovered_servers_empty">Nessun server trovato nella rete locale.</string>
@@ -311,7 +311,7 @@
     <string name="user_picker_disable_title">Disabilita</string>
     <string name="auto_sign_in">Login automatico</string>
     <string name="lbl_switch_user">Cambia utente</string>
-    <string name="no_network_permissions">Jellyfin richiede i permessi di rete per funzionare</string>
+    <string name="no_network_permissions">SuperJelly richiede i permessi di rete per funzionare</string>
     <string name="lbl_time_range">%1$s–%2$s</string>
     <string name="lbl_name_date">%1$s (%2$s)</string>
     <string name="lbl_on_channel">Su %1$s</string>
@@ -333,7 +333,7 @@
     <string name="no_user_warning">Non abbiamo trovato alcun utente!
 \nAggiungi un nuovo utente premendo il pulsante \"Aggiungi utente\".</string>
     <string name="welcome_content">Connettiti al tuo server per incominciare.</string>
-    <string name="welcome_title">Benvenuto su Jellyfin!</string>
+    <string name="welcome_title">Benvenuto su SuperJelly!</string>
     <string name="saved_servers">Server salvati</string>
     <string name="press_to_close">Premi per chiudere</string>
     <string name="pref_theme_muted_purple">Viola tenue</string>
@@ -353,7 +353,7 @@
     <string name="license_artifact">artefatto</string>
     <string name="license_version">Versione</string>
     <string name="license_description">Descrizione</string>
-    <string name="licenses_link_description">Visualizza le licenze delle librerie usate dall\'app Jellyfin</string>
+    <string name="licenses_link_description">Visualizza le licenze delle librerie usate dall\'app SuperJelly</string>
     <string name="licenses_link">Licenze</string>
     <string name="select_version">Versione</string>
     <string name="last_use">Usato di recente</string>
@@ -372,7 +372,7 @@
     <string name="home_section_library">I miei media</string>
     <string name="home_section_latest_media">Ultimi media aggiunti</string>
     <string name="searchable_settings_description">Media</string>
-    <string name="searchable_hint">Cerca in Jellyfin</string>
+    <string name="searchable_hint">Cerca in SuperJelly</string>
     <string name="pref_subtitles_size">Dimensioni testo</string>
     <string name="pref_subtitles_background_summary">Mostra lo sfondo nero dietro i sottotitoli</string>
     <string name="pref_subtitles_background_title">Abilita lo sfondo</string>
@@ -409,7 +409,7 @@
     <string name="lbl_shuffle_queue">Riproduzione casuale</string>
     <string name="login_quickconnect_step_3">3. Inserisci il seguente codice:</string>
     <string name="login_quickconnect_step_2">2. Apri il menù utente e vai sulla pagina Quick Connect</string>
-    <string name="login_quickconnect_step_1">1. Apri l\'app Jellyfin sul cellulare o sul browser ed entra con il tuo account</string>
+    <string name="login_quickconnect_step_1">1. Apri SuperJelly/Jellyfin sul cellulare o sul browser ed entra con il tuo account</string>
     <string name="login_other_options">Altre opzioni:</string>
     <string name="login_connect_to">Connessione a %1$s</string>
     <string name="input_password">Password</string>
@@ -456,7 +456,7 @@
     <string name="item_deletion_failed">Impossibile rimuovere %1$s</string>
     <string name="pref_enable_media_management">Abilita la gestione dei media</string>
     <string name="app_notification_beta">App aggiornata a %1$s
-\nGrazie per la partecipazione al programma Jellyfin beta.</string>
+\nGrazie per la partecipazione al programma SuperJelly beta.</string>
     <string name="pref_enable_media_management_description">Mostra l\'opzione per gestire i media durante la navigazione</string>
     <string name="pref_enable_trailer">Abilita trailer</string>
     <string name="pref_enable_trailer_description">Avvia trailer automatici nella preview mentre scorri. Ottimizzato con caricamento ritardato e cache per mantenere Android TV reattivo.</string>
@@ -468,7 +468,7 @@
         <item quantity="other">%1$s ore</item>
     </plurals>
     <string name="pref_screensaver">Salvaschermo</string>
-    <string name="pref_screensaver_inapp_enabled_description">Motra il salvaschermo Jellyfin mentre l\'app è aperta</string>
+    <string name="pref_screensaver_inapp_enabled_description">Mostra il salvaschermo SuperJelly mentre l\'app è aperta</string>
     <string name="pref_screensaver_inapp_timeout">Avvia il salvaschermo dopo</string>
     <plurals name="minutes">
         <item quantity="one">%1$s minuto</item>
@@ -618,7 +618,7 @@
     <string name="lbl_music">Musica</string>
     <string name="lbl_photo">Foto</string>
     <string name="lbl_tv_show">Serie TV</string>
-    <string name="lbl_jellyfin">Jellyfin</string>
+    <string name="lbl_jellyfin">SuperJelly</string>
     <string name="lbl_movie">Film</string>
     <string name="lbl_episode">Episodio</string>
 
@@ -647,4 +647,12 @@
     <string name="lbl_talk_show">Talk Show</string>
     <string name="pref_subtitles_position">Distanza dal basso</string>
     <string name="lbl_more_info">Altre Info</string>
+
+    <string name="pref_check_apk_updates">Controlla aggiornamenti app</string>
+    <string name="pref_check_apk_updates_description">Cerca APK SuperJelly più recenti nella cartella remota configurata</string>
+    <string name="apk_update_none_title">SuperJelly è aggiornata</string>
+    <string name="apk_update_none_message">Nella cartella remota degli aggiornamenti non è stato trovato nessun APK più recente.</string>
+    <string name="apk_update_check_failed_title">Controllo aggiornamenti non riuscito</string>
+    <string name="apk_update_check_failed_message">SuperJelly non riesce a leggere la cartella remota degli aggiornamenti. Controlla la connessione e riprova più tardi.</string>
+
 </resources>

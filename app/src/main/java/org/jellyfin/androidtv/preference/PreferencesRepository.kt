@@ -1,5 +1,6 @@
 package org.jellyfin.androidtv.preference
 
+import android.content.Context
 import kotlinx.coroutines.runBlocking
 import org.jellyfin.sdk.api.client.ApiClient
 import kotlin.collections.set
@@ -11,11 +12,12 @@ class PreferencesRepository(
 	private val api: ApiClient,
 	private val liveTvPreferences: LiveTvPreferences,
 	private val userSettingPreferences: UserSettingPreferences,
+	private val context: Context,
 ) {
 	private val libraryPreferences = mutableMapOf<String, LibraryPreferences>()
 
 	fun getLibraryPreferences(preferencesId: String): LibraryPreferences {
-		val store = libraryPreferences[preferencesId] ?: LibraryPreferences(preferencesId, api)
+		val store = libraryPreferences[preferencesId] ?: LibraryPreferences(preferencesId, api, context)
 
 		libraryPreferences[preferencesId] = store
 

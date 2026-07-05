@@ -1,5 +1,6 @@
 package org.jellyfin.androidtv.preference
 
+import android.content.Context
 import org.jellyfin.androidtv.auth.repository.UserRepository
 import org.jellyfin.androidtv.constant.HomeSectionType
 import org.jellyfin.androidtv.preference.store.DisplayPreferencesStore
@@ -10,10 +11,12 @@ import org.jellyfin.sdk.api.client.ApiClient
 class UserSettingPreferences(
 	api: ApiClient,
 	private val userRepository: UserRepository,
+	context: Context,
 ) : DisplayPreferencesStore(
 	displayPreferencesId = "usersettings-default", // Will be updated dynamically
 	api = api,
 	app = "emby",
+	context = context,
 ) {
 
 	init {

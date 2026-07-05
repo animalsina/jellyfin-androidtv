@@ -11,18 +11,19 @@ https://files.animalsina.work/jellyfin/android-tv/
 La cartella deve esporre un listing HTTP/HTML contenente APK con nome:
 
 ```text
-jellyfin-androidtv-vX.Y.Z-debug.apk
+superjelly-androidtv-vX.Y.Z-debug.apk
+# compatibilità: accetta ancora anche jellyfin-androidtv-vX.Y.Z-debug.apk
 ```
 
 Esempio:
 
 ```text
-jellyfin-androidtv-v1.0.12-debug.apk
+superjelly-androidtv-v1.0.13-debug.apk
 ```
 
 ## Comportamento
 
-All’avvio della `MainActivity`, l’app:
+All’avvio della `MainActivity`, e manualmente dal tasto nelle Impostazioni, l’app:
 
 1. legge il listing della cartella remota;
 2. estrae le versioni dai file APK compatibili;

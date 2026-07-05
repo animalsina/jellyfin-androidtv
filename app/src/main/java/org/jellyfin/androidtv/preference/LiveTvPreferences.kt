@@ -1,5 +1,6 @@
 package org.jellyfin.androidtv.preference
 
+import android.content.Context
 import org.jellyfin.androidtv.preference.store.DisplayPreferencesStore
 import org.jellyfin.preference.booleanPreference
 import org.jellyfin.preference.stringPreference
@@ -8,9 +9,11 @@ import org.jellyfin.sdk.model.api.ItemSortBy
 
 class LiveTvPreferences(
 	api: ApiClient,
+	context: Context,
 ) : DisplayPreferencesStore(
 	displayPreferencesId = "livetv",
 	api = api,
+	context = context,
 ) {
 	companion object {
 		val channelOrder = stringPreference("livetv-channelorder", ItemSortBy.DATE_PLAYED.name)

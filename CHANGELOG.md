@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.0.13 - 2026-07-05
+
+- Rinominata l’app visibile in SuperJelly, inclusi launcher, splash/logo, banner e testi principali dell’interfaccia.
+- Aggiornata l’icona con una variante SuperJelly che mantiene il linguaggio visivo viola/ciano del client originale.
+- Aggiunto nelle Impostazioni il controllo manuale degli aggiornamenti APK dalla cartella remota configurata.
+- Le preferenze di visualizzazione delle librerie restano persistenti tramite cache locale, così dimensione immagini, tipo immagine, direzione griglia, filtri e ordinamento non vengono persi cambiando pagina o in caso di salvataggio remoto non disponibile.
+
 ## v1.0.12 - 2026-07-05
 
 - Aggiunto controllo automatico degli aggiornamenti APK dalla cartella remota predefinita `https://files.animalsina.work/jellyfin/android-tv/`.

@@ -1,5 +1,6 @@
 package org.jellyfin.androidtv.preference
 
+import android.content.Context
 import org.jellyfin.androidtv.constant.GridDirection
 import org.jellyfin.androidtv.constant.ImageType
 import org.jellyfin.androidtv.constant.PosterSize
@@ -13,9 +14,11 @@ import org.jellyfin.sdk.model.api.SortOrder
 class LibraryPreferences(
 	displayPreferencesId: String,
 	api: ApiClient,
+	context: Context,
 ) : DisplayPreferencesStore(
 	displayPreferencesId = displayPreferencesId,
 	api = api,
+	context = context,
 ) {
 	companion object {
 		val posterSize = enumPreference("PosterSize", PosterSize.MED)

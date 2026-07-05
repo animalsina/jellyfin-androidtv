@@ -1,5 +1,6 @@
 package org.jellyfin.androidtv.preference.store
 
+import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jellyfin.preference.Preference
@@ -19,15 +20,20 @@ abstract class DisplayPreferencesStore(
 	protected var displayPreferencesId: String,
 	protected var app: String = "jellyfin-androidtv",
 	private val api: ApiClient,
+	context: Context,
 ) : AsyncPreferenceStore<Unit, Unit>() {
 	private var displayPreferencesDto: DisplayPreferencesDto? = null
 	private var cachedPreferences: MutableMap<String, String?> = mutableMapOf()
 	private var lastCommitTime: Long = 0
+	private val localPreferences = context.applicationContext.getSharedPreferences(LOCAL_PREFERENCES_NAME, Context.MODE_PRIVATE)
+
 	override val shouldUpdate: Boolean
 		get() = displayPreferencesDto == null || (System.currentTimeMillis() - lastCommitTime > 30_000)
 
 	override suspend fun commit(): Boolean {
 		if (displayPreferencesDto == null) return false
+
+		persistLocalCache()
 
 		try {
 			api.displayPreferencesApi.updateDisplayPreferences(
@@ -69,7 +75,9 @@ abstract class DisplayPreferencesStore(
 				).content
 			}
 			displayPreferencesDto = result
-			cachedPreferences = result.customPrefs.toMutableMap()
+			cachedPreferences = result.customPrefs.toMutableMap().apply {
+				putAll(loadLocalCache())
+			}
 			// Reset commit time when loading fresh data from server
 			lastCommitTime = 0
 
@@ -81,6 +89,8 @@ abstract class DisplayPreferencesStore(
 				Timber.i("Creating an empty DisplayPreferencesDto for next commit.")
 				displayPreferencesDto = DisplayPreferencesDto.empty()
 			}
+
+			cachedPreferences.putAll(loadLocalCache())
 
 			return false
 		}
@@ -101,28 +111,15 @@ abstract class DisplayPreferencesStore(
 	override fun getString(key: String, defaultValue: String) =
 		cachedPreferences[key] ?: defaultValue
 
-	override fun setInt(key: String, value: Int) {
-		cachedPreferences[key] = value.toString()
-	}
-
-	override fun setLong(key: String, value: Long) {
-		cachedPreferences[key] = value.toString()
-	}
-
-	override fun setFloat(key: String, value: Float) {
-		cachedPreferences[key] = value.toString()
-	}
-
-	override fun setBool(key: String, value: Boolean) {
-		cachedPreferences[key] = value.toString()
-	}
-
-	override fun setString(key: String, value: String) {
-		cachedPreferences[key] = value
-	}
+	override fun setInt(key: String, value: Int) = setCachedPreference(key, value.toString())
+	override fun setLong(key: String, value: Long) = setCachedPreference(key, value.toString())
+	override fun setFloat(key: String, value: Float) = setCachedPreference(key, value.toString())
+	override fun setBool(key: String, value: Boolean) = setCachedPreference(key, value.toString())
+	override fun setString(key: String, value: String) = setCachedPreference(key, value)
 
 	override fun <T : Any> delete(preference: Preference<T>) {
 		cachedPreferences.remove(preference.key)
+		localPreferences.edit().remove(localKey(preference.key)).apply()
 	}
 
 	override fun <T : Enum<T>> getEnum(preference: Preference<T>): T {
@@ -145,6 +142,35 @@ abstract class DisplayPreferencesStore(
 		TODO("The DisplayPreferencesStore does not support migrations")
 	}
 
+	private fun setCachedPreference(key: String, value: String) {
+		cachedPreferences[key] = value
+		localPreferences.edit().putString(localKey(key), value).apply()
+	}
+
+	private fun loadLocalCache(): Map<String, String?> {
+		val prefix = localPrefix()
+		return localPreferences.all
+			.filterKeys { it.startsWith(prefix) }
+			.mapKeys { it.key.removePrefix(prefix) }
+			.mapValues { it.value as? String }
+	}
+
+	private fun persistLocalCache() {
+		val editor = localPreferences.edit()
+		val prefix = localPrefix()
+		localPreferences.all.keys
+			.filter { it.startsWith(prefix) }
+			.forEach { editor.remove(it) }
+		cachedPreferences.forEach { (key, value) ->
+			if (value == null) editor.remove(localKey(key)) else editor.putString(localKey(key), value)
+		}
+		editor.apply()
+	}
+
+	private fun localKey(key: String) = "${localPrefix()}$key"
+
+	private fun localPrefix() = "$app::$displayPreferencesId::"
+
 	/**
 	 * Create an empty [DisplayPreferencesDto] with default values.
 	 */
@@ -159,4 +185,8 @@ abstract class DisplayPreferencesStore(
 		showSidebar = false,
 		sortOrder = SortOrder.ASCENDING
 	)
+
+	companion object {
+		private const val LOCAL_PREFERENCES_NAME = "display_preferences_local_cache"
+	}
 }

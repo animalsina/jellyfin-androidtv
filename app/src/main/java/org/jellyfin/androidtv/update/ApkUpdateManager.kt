@@ -33,18 +33,27 @@ import java.util.Locale
 class ApkUpdateManager(private val activity: FragmentActivity) {
 	private val preferences = activity.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
 
-	fun checkForUpdates() {
-		if (checkedThisProcess) return
-		checkedThisProcess = true
+	fun checkForUpdates(force: Boolean = false) {
+		if (!force && checkedThisProcess) return
+		if (!force) checkedThisProcess = true
 
 		activity.lifecycleScope.launch {
-			val update = withContext(Dispatchers.IO) { findLatestUpdate() }
-			if (update == null || activity.isFinishing || activity.isDestroyed) return@launch
+			when (val result = withContext(Dispatchers.IO) { findLatestUpdate() }) {
+				is ApkUpdateCheckResult.Available -> {
+					if (activity.isFinishing || activity.isDestroyed) return@launch
 
-			val dismissedVersion = preferences.getString(KEY_DISMISSED_VERSION, null)
-			if (dismissedVersion == update.version) return@launch
+					val dismissedVersion = preferences.getString(KEY_DISMISSED_VERSION, null)
+					if (!force && dismissedVersion == result.update.version) return@launch
 
-			showUpdateDialog(update)
+					showUpdateDialog(result.update)
+				}
+				ApkUpdateCheckResult.NotFound -> {
+					if (force && !activity.isFinishing && !activity.isDestroyed) showNoUpdateDialog()
+				}
+				ApkUpdateCheckResult.Failed -> {
+					if (force && !activity.isFinishing && !activity.isDestroyed) showCheckFailedDialog()
+				}
+			}
 		}
 	}
 
@@ -123,6 +132,22 @@ class ApkUpdateManager(private val activity: FragmentActivity) {
 		}
 	}
 
+	private fun showCheckFailedDialog() {
+		AlertDialog.Builder(activity)
+			.setTitle(R.string.apk_update_check_failed_title)
+			.setMessage(R.string.apk_update_check_failed_message)
+			.setPositiveButton(android.R.string.ok, null)
+			.show()
+	}
+
+	private fun showNoUpdateDialog() {
+		AlertDialog.Builder(activity)
+			.setTitle(R.string.apk_update_none_title)
+			.setMessage(R.string.apk_update_none_message)
+			.setPositiveButton(android.R.string.ok, null)
+			.show()
+	}
+
 	private fun showDownloadFailed() {
 		AlertDialog.Builder(activity)
 			.setTitle(R.string.apk_update_failed_title)
@@ -131,7 +156,7 @@ class ApkUpdateManager(private val activity: FragmentActivity) {
 			.show()
 	}
 
-	private fun findLatestUpdate(): RemoteApk? {
+	private fun findLatestUpdate(): ApkUpdateCheckResult {
 		return runCatching {
 			val folderUrl = DEFAULT_UPDATE_FOLDER_URL.ensureTrailingSlash()
 			val connection = (URL(folderUrl).openConnection() as HttpURLConnection).apply {
@@ -143,7 +168,7 @@ class ApkUpdateManager(private val activity: FragmentActivity) {
 			connection.inputStream.bufferedReader().use { reader ->
 				val body = reader.readText()
 				val current = Version.parse(BuildConfig.VERSION_NAME)
-				APK_FILE_REGEX.findAll(body)
+				val latest = APK_FILE_REGEX.findAll(body)
 					.mapNotNull { match ->
 						val fileName = match.value.substringAfterLast('/')
 						val version = match.groupValues.getOrNull(1).orEmpty()
@@ -156,10 +181,12 @@ class ApkUpdateManager(private val activity: FragmentActivity) {
 					}
 					.filter { Version.parse(it.version) > current }
 					.maxByOrNull { Version.parse(it.version) }
+
+				if (latest == null) ApkUpdateCheckResult.NotFound else ApkUpdateCheckResult.Available(latest)
 			}
 		}.onFailure { error ->
 			Timber.w(error, "Unable to check APK updates")
-		}.getOrNull()
+		}.getOrElse { ApkUpdateCheckResult.Failed }
 	}
 
 	private fun downloadApk(update: RemoteApk): File? {
@@ -200,6 +227,12 @@ class ApkUpdateManager(private val activity: FragmentActivity) {
 
 	private fun String.ensureTrailingSlash() = if (endsWith('/')) this else "$this/"
 
+	private sealed interface ApkUpdateCheckResult {
+		data class Available(val update: RemoteApk) : ApkUpdateCheckResult
+		data object NotFound : ApkUpdateCheckResult
+		data object Failed : ApkUpdateCheckResult
+	}
+
 	private data class RemoteApk(
 		val version: String,
 		val fileName: String,
@@ -233,7 +266,7 @@ class ApkUpdateManager(private val activity: FragmentActivity) {
 		private const val NETWORK_TIMEOUT_MS = 8_000
 		private const val DOWNLOAD_TIMEOUT_MS = 30_000
 		private const val APK_MIME_TYPE = "application/vnd.android.package-archive"
-		private val APK_FILE_REGEX = Regex("jellyfin-androidtv-v([0-9]+\\.[0-9]+\\.[0-9]+)-debug\\.apk", RegexOption.IGNORE_CASE)
+		private val APK_FILE_REGEX = Regex("(?:jellyfin|superjelly)-androidtv-v([0-9]+\\.[0-9]+\\.[0-9]+)-debug\\.apk", RegexOption.IGNORE_CASE)
 		private var checkedThisProcess = false
 	}
 }
