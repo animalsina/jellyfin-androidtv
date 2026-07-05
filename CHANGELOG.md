@@ -1,5 +1,14 @@
 # Changelog
 
+## v1.0.14 - 2026-07-05
+
+- La navigazione nella home è più fluida: i backdrop vengono caricati con debounce, dimensioni ridotte e salto dei caricamenti duplicati.
+- Le righe vuote della home vengono nascoste invece di mostrare il grande placeholder “Nessun elemento”.
+- Le copertine/anteprime superiori restano stabili in alto e vengono nascoste correttamente quando un elemento non ha immagini disponibili.
+- Le anteprime trailer sono più leggere: le richieste restano cancellabili al cambio focus e partono solo dopo una selezione stabile.
+- La sezione Navigazione/Librerie è stata spostata in alto nelle impostazioni di personalizzazione.
+- La riga dei provider esterni è stata rinominata e l’apertura delle app installate è più affidabile per Pluto TV, RaiPlay e Prime Video Android TV.
+
 ## v1.0.13 - 2026-07-05
 
 - Rinominata l’app visibile in SuperJelly, inclusi launcher, splash/logo, banner e testi principali dell’interfaccia.

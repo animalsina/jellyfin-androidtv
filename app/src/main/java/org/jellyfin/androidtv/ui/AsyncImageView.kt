@@ -43,6 +43,7 @@ class AsyncImageView @JvmOverloads constructor(
 	private val styledAttributes = context.obtainStyledAttributes(attrs, R.styleable.AsyncImageView, defStyleAttr, 0)
 	private val imageLoader by inject<ImageLoader>()
 	private var loadJob: Job? = null
+	private var lastLoadKey: String? = null
 
 	/**
 	 * The duration of the crossfade when changing switching the images of the url, blurhash and
@@ -68,6 +69,10 @@ class AsyncImageView @JvmOverloads constructor(
 		aspectRatio: Double = 1.0,
 		blurHashResolution: Int = 32,
 	) = doOnAttach {
+		val loadKey = listOf(url, blurHash, placeholder?.constantState, aspectRatio, blurHashResolution, circleCrop).joinToString("|")
+		if (loadKey == lastLoadKey && drawable != null) return@doOnAttach
+		lastLoadKey = loadKey
+
 		// Cancel the previous load if still running
 		loadJob?.cancel()
 

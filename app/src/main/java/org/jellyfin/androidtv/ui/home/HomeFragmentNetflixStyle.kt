@@ -17,7 +17,6 @@ import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentContainerView
 import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.findViewTreeLifecycleOwner
 import androidx.lifecycle.flowWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
@@ -49,6 +48,7 @@ import org.jellyfin.androidtv.ui.navigation.NavigationRepository
 import org.jellyfin.androidtv.ui.playback.MediaManager
 import org.jellyfin.androidtv.ui.startup.StartupActivity
 import org.jellyfin.androidtv.util.ImageHelper
+import org.jellyfin.androidtv.util.apiclient.getUrl
 import org.jellyfin.androidtv.util.apiclient.itemBackdropImages
 import org.jellyfin.androidtv.util.apiclient.itemImages
 import org.jellyfin.androidtv.util.apiclient.parentBackdropImages
@@ -57,6 +57,7 @@ import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.CollectionType
 import org.jellyfin.sdk.model.api.ImageType
+import org.jellyfin.sdk.api.client.ApiClient
 import org.koin.android.ext.android.get
 import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.activityViewModel
@@ -66,6 +67,7 @@ import java.util.concurrent.TimeUnit
 
 
 class HomeFragmentNetflixStyle : Fragment() {
+	private val api by inject<ApiClient>()
 	private val sessionRepository by inject<SessionRepository>()
 	private val userRepository by inject<UserRepository>()
 	private val serverRepository by inject<ServerRepository>()
@@ -104,6 +106,7 @@ class HomeFragmentNetflixStyle : Fragment() {
 		.build()
 	private var trailerJob: Job? = null
 	private var trailerHideJob: Job? = null
+	private var previewBackdropJob: Job? = null
 	private var trailerSearchCall: Call? = null
 	private var trailerCheckCall: Call? = null
 	private var currentPreviewItemId: String? = null
@@ -116,6 +119,7 @@ class HomeFragmentNetflixStyle : Fragment() {
 		private val TRAILER_TYPES =
 			setOf(BaseItemKind.SERIES, BaseItemKind.EPISODE, BaseItemKind.MOVIE, BaseItemKind.SEASON, BaseItemKind.VIDEO)
 		private const val TRAILER_START_DELAY_MS = 2_800L
+		private const val PREVIEW_BACKDROP_LOAD_DELAY_MS = 160L
 		private const val TRAILER_MAX_DURATION_MS = 45_000L
 		private const val TRAILER_FADE_OUT_MS = 250L
 		private const val TRAILER_NETWORK_TIMEOUT_MS = 4_000L
@@ -219,6 +223,7 @@ class HomeFragmentNetflixStyle : Fragment() {
 	fun updatePreviewSection(item: BaseRowItem?) {
 		resetTrailerTimer()
 		cancelTrailerHide()
+		previewBackdropJob?.cancel()
 
 		if (item == null || item.baseItem == null) {
 			resetPreview()
@@ -248,21 +253,12 @@ class HomeFragmentNetflixStyle : Fragment() {
 		}
 
 		if (backdropImage != null) {
-			val backdropUrl = imageHelper.getImageUrl(backdropImage)
-			if (currentBackdropUrl != backdropUrl) {
-				currentBackdropUrl = backdropUrl
-				previewBackground.doOnAttach {
-					it.findViewTreeLifecycleOwner()?.lifecycleScope?.launch {
-						previewBackground.load(backdropUrl, blurHash = null)
-						previewBackground.visibility = View.VISIBLE
-						previewGradient.visibility = View.VISIBLE
-					}
-				}
-			} else {
-				previewBackground.visibility = View.VISIBLE
-				previewGradient.visibility = View.VISIBLE
-			}
+			val backdropWidth = resources.getDimensionPixelSize(R.dimen.home_preview_width)
+			val backdropHeight = resources.getDimensionPixelSize(R.dimen.home_preview_width) * 3 / 4
+			val backdropUrl = backdropImage.getUrl(api, fillWidth = backdropWidth, fillHeight = backdropHeight)
+			loadPreviewBackdrop(backdropUrl, backdropImage.blurHash, nextItemId)
 		} else {
+			previewBackdropJob?.cancel()
 			currentBackdropUrl = null
 			previewBackground.visibility = View.GONE
 			previewGradient.visibility = View.GONE
@@ -285,6 +281,28 @@ class HomeFragmentNetflixStyle : Fragment() {
 
 		if (isTrailerEnabled() && TRAILER_TYPES.contains(baseItem.type) && !isTrailerBackoffActive()) {
 			playYouTubeTrailerWithDelay(item, nextItemId)
+		}
+	}
+
+	private fun loadPreviewBackdrop(backdropUrl: String, blurHash: String?, itemId: String) {
+		if (currentBackdropUrl == backdropUrl && previewBackground.drawable != null) {
+			previewBackground.visibility = View.VISIBLE
+			previewGradient.visibility = View.VISIBLE
+			return
+		}
+
+		currentBackdropUrl = backdropUrl
+		previewBackdropJob?.cancel()
+		previewBackdropJob = viewLifecycleOwner.lifecycleScope.launch {
+			delay(PREVIEW_BACKDROP_LOAD_DELAY_MS)
+			if (!isAdded || itemId != currentPreviewItemId) return@launch
+
+			previewBackground.doOnAttach {
+				if (itemId != currentPreviewItemId) return@doOnAttach
+				previewBackground.visibility = View.VISIBLE
+				previewGradient.visibility = View.VISIBLE
+				previewBackground.load(backdropUrl, blurHash = blurHash, blurHashResolution = 12)
+			}
 		}
 	}
 
@@ -795,6 +813,7 @@ class HomeFragmentNetflixStyle : Fragment() {
 		currentPreviewItemId = null
 		currentBackdropUrl = null
 		resetTrailer(clearWebView = true)
+		previewBackdropJob?.cancel()
 
 		previewBackground.visibility = View.GONE
 		previewGradient.visibility = View.GONE
@@ -892,6 +911,7 @@ class HomeFragmentNetflixStyle : Fragment() {
 	override fun onDestroyView() {
 		resetTrailerTimer()
 		cancelTrailerHide()
+		previewBackdropJob?.cancel()
 		trailerSearchCall?.cancel()
 		trailerCheckCall?.cancel()
 		if (::trailerWebView.isInitialized) {

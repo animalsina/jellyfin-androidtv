@@ -187,7 +187,9 @@ public class CardPresenter extends Presenter {
         }
 
         protected void updateCardViewImage(@Nullable String url, @Nullable String blurHash) {
-            mCardView.getMainImageView().load(url, blurHash, mDefaultCardImage, aspect, 32);
+            // A low blur-hash resolution keeps Android TV browsing smooth while still avoiding
+            // harsh placeholder flashes during cover loading.
+            mCardView.getMainImageView().load(url, blurHash, mDefaultCardImage, aspect, 12);
         }
 
         protected void resetCardView() {

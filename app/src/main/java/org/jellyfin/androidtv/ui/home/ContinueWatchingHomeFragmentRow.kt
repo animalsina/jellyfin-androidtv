@@ -36,6 +36,7 @@ class ContinueWatchingHomeFragmentRow(
 			rowsAdapter
 		)
 
+		rowAdapter.setSuppressEmptyPlaceholder(true)
 		rowAdapter.setReRetrieveTriggers(browseRowDef.changeTriggers)
 		val row = ListRow(header, rowAdapter)
 		rowAdapter.setRow(row)

@@ -39,6 +39,9 @@ class BackgroundService(
 	companion object {
 		val SLIDESHOW_DURATION = 30.seconds
 		val TRANSITION_DURATION = 800.milliseconds
+		private const val BACKDROP_LOAD_DEBOUNCE_MS = 180L
+		private const val BACKDROP_MAX_WIDTH = 1280
+		private const val BACKDROP_MAX_HEIGHT = 720
 	}
 
 	// Async
@@ -46,6 +49,7 @@ class BackgroundService(
 	private var loadBackgroundsJob: Job? = null
 	private var updateBackgroundTimerJob: Job? = null
 	private var lastBackgroundTimerUpdate = 0L
+	private var lastBackdropUrls = emptySet<String>()
 
 	// Current background data
 	private var _backgrounds = emptyList<ImageBitmap>()
@@ -85,7 +89,7 @@ class BackgroundService(
 						val seriesBackdrops = series.itemBackdropImages
 						if (seriesBackdrops.isNotEmpty()) {
 							val seriesBackdropUrls = seriesBackdrops
-								.map { it.getUrl(api) }
+								.map { it.getUrl(api, maxWidth = BACKDROP_MAX_WIDTH, maxHeight = BACKDROP_MAX_HEIGHT) }
 								.toSet()
 							loadBackgrounds(seriesBackdropUrls)
 							return@launch
@@ -105,7 +109,7 @@ class BackgroundService(
 							aspectRatio = baseItem.primaryImageAspectRatio?.toFloat(),
 							index = null,
 						)
-						val screenshotUrl = setOf(screenshotImage.getUrl(api))
+						val screenshotUrl = setOf(screenshotImage.getUrl(api, maxWidth = BACKDROP_MAX_WIDTH, maxHeight = BACKDROP_MAX_HEIGHT))
 						loadBackgrounds(screenshotUrl)
 					}
 				}
@@ -114,7 +118,7 @@ class BackgroundService(
 		}
 		
 		val backdropUrls = backdropImages
-			.map { it.getUrl(api) }
+			.map { it.getUrl(api, maxWidth = BACKDROP_MAX_WIDTH, maxHeight = BACKDROP_MAX_HEIGHT) }
 			.toSet()
 
 		loadBackgrounds(backdropUrls)
@@ -148,9 +152,15 @@ class BackgroundService(
 		// Re-enable backgrounds if disabled
 		_enabled.value = true
 
-		// Cancel current loading job
+		if (backdropUrls == lastBackdropUrls && _backgrounds.isNotEmpty()) return
+		lastBackdropUrls = backdropUrls
+
+		// Cancel current loading job. A short delay keeps fast D-pad scrolling from decoding
+		// a full backdrop for every transient focus event.
 		loadBackgroundsJob?.cancel()
 		loadBackgroundsJob = scope.launch(Dispatchers.IO) {
+			delay(BACKDROP_LOAD_DEBOUNCE_MS)
+
 			_backgrounds = backdropUrls.mapNotNull { url ->
 				imageLoader.execute(
 					request = ImageRequest.Builder(context).data(url).build()
@@ -165,6 +175,7 @@ class BackgroundService(
 
 	fun clearBackgrounds() {
 		loadBackgroundsJob?.cancel()
+		lastBackdropUrls = emptySet()
 
 		// Re-enable backgrounds if disabled
 		_enabled.value = true

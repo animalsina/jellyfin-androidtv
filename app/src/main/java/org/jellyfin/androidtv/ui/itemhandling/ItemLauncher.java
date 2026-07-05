@@ -255,15 +255,27 @@ public class ItemLauncher {
             case GridButton:
                 switch (((GridButtonBaseRowItem) rowItem).getGridButton().getId()) {
                     case ExternalProviderOption.PLUTO_TV_OPTION_ID:
-                        openExternalProvider(context, ExternalProviderOption.PLUTO_TV_PACKAGE, "https://pluto.tv/");
+                        openExternalProvider(
+                                context,
+                                new String[]{ExternalProviderOption.PLUTO_TV_PACKAGE, "tv.pluto.androidtv"},
+                                "https://pluto.tv/"
+                        );
                         break;
 
                     case ExternalProviderOption.RAIPLAY_OPTION_ID:
-                        openExternalProvider(context, ExternalProviderOption.RAIPLAY_PACKAGE, "https://www.raiplay.it/");
+                        openExternalProvider(
+                                context,
+                                new String[]{ExternalProviderOption.RAIPLAY_PACKAGE, "it.rainet"},
+                                "https://www.raiplay.it/"
+                        );
                         break;
 
                     case ExternalProviderOption.PRIME_VIDEO_OPTION_ID:
-                        openExternalProvider(context, ExternalProviderOption.PRIME_VIDEO_PACKAGE, "https://www.primevideo.com/");
+                        openExternalProvider(
+                                context,
+                                new String[]{ExternalProviderOption.PRIME_VIDEO_PACKAGE, "com.amazon.avod.thirdpartyclient"},
+                                "https://app.primevideo.com/"
+                        );
                         break;
 
                     case LiveTvOption.LIVE_TV_GUIDE_OPTION_ID:
@@ -285,28 +297,37 @@ public class ItemLauncher {
                 break;
         }
     }
-    private void openExternalProvider(Context context, String packageName, String fallbackUrl) {
-        try {
-            Intent launchIntent = context.getPackageManager().getLaunchIntentForPackage(packageName);
-            if (launchIntent != null) {
-                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                context.startActivity(launchIntent);
-                return;
+    private void openExternalProvider(Context context, String[] packageNames, String fallbackUrl) {
+        for (String packageName : packageNames) {
+            try {
+                Intent launchIntent = context.getPackageManager().getLaunchIntentForPackage(packageName);
+                if (launchIntent != null) {
+                    launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    context.startActivity(launchIntent);
+                    return;
+                }
+            } catch (Exception error) {
+                Timber.w(error, "Unable to launch external provider package %s", packageName);
             }
+        }
 
+        try {
+            Intent webIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(fallbackUrl));
+            webIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            context.startActivity(webIntent);
+            return;
+        } catch (Exception webError) {
+            Timber.w(webError, "Unable to open external provider URL %s", fallbackUrl);
+        }
+
+        try {
             Toast.makeText(context, R.string.msg_external_provider_missing, Toast.LENGTH_SHORT).show();
-            Intent storeIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=" + packageName));
+            Intent storeIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=" + packageNames[0]));
             storeIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             context.startActivity(storeIntent);
         } catch (Exception storeError) {
-            try {
-                Intent webIntent = new Intent(Intent.ACTION_VIEW, Uri.parse(fallbackUrl));
-                webIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                context.startActivity(webIntent);
-            } catch (Exception webError) {
-                Toast.makeText(context, R.string.msg_external_provider_unavailable, Toast.LENGTH_SHORT).show();
-                Timber.w(webError, "Unable to open external provider %s", packageName);
-            }
+            Toast.makeText(context, R.string.msg_external_provider_unavailable, Toast.LENGTH_SHORT).show();
+            Timber.w(storeError, "Unable to open external provider store page");
         }
     }
 

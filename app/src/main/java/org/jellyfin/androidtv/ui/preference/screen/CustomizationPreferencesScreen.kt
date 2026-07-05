@@ -25,6 +25,24 @@ class CustomizationPreferencesScreen : OptionsFragment() {
 		setTitle(R.string.pref_customization)
 
 		category {
+			setTitle(R.string.pref_browsing)
+
+			link {
+				setTitle(R.string.home_prefs)
+				setContent(R.string.pref_home_description)
+				icon = R.drawable.ic_house
+				withFragment<HomePreferencesScreen>()
+			}
+
+			link {
+				setTitle(R.string.pref_libraries)
+				setContent(R.string.pref_libraries_description)
+				icon = R.drawable.ic_grid
+				withFragment<LibrariesPreferencesScreen>()
+			}
+		}
+
+		category {
 			setTitle(R.string.pref_theme)
 
 			enum<AppTheme> {
@@ -78,23 +96,6 @@ class CustomizationPreferencesScreen : OptionsFragment() {
 			}
 		}
 
-		category {
-			setTitle(R.string.pref_browsing)
-
-			link {
-				setTitle(R.string.home_prefs)
-				setContent(R.string.pref_home_description)
-				icon = R.drawable.ic_house
-				withFragment<HomePreferencesScreen>()
-			}
-
-			link {
-				setTitle(R.string.pref_libraries)
-				setContent(R.string.pref_libraries_description)
-				icon = R.drawable.ic_grid
-				withFragment<LibrariesPreferencesScreen>()
-			}
-		}
 
 		category {
 			setTitle(R.string.pref_screensaver)

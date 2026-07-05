@@ -1,6 +1,6 @@
 {
   "merge_mode": "merge",
-  "project_name": "jellyfin-androidtv",
+  "project_name": "superjelly-androidtv",
   "source_path": ".",
   "output_name": "{project_name}-export",
   "destination_path": "~/tmp/{project_name}/exports",

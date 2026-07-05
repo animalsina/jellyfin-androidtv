@@ -6,6 +6,6 @@ object ExternalProviderOption {
 	const val PRIME_VIDEO_OPTION_ID = 90_003
 
 	const val PLUTO_TV_PACKAGE = "tv.pluto.android"
-	const val RAIPLAY_PACKAGE = "it.rainet"
-	const val PRIME_VIDEO_PACKAGE = "com.amazon.avod.thirdpartyclient"
+	const val RAIPLAY_PACKAGE = "it.rainet.androidtv"
+	const val PRIME_VIDEO_PACKAGE = "com.amazon.amazonvideo.livingroom"
 }

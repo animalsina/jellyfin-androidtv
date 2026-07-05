@@ -23,6 +23,8 @@ class HomeFragmentViewsRow(
 		val presenter = if (small) smallCardPresenter else largeCardPresenter
 		val rowAdapter = ItemRowAdapter(context, GetUserViewsRequest, presenter, rowsAdapter)
 
+		rowAdapter.setSuppressEmptyPlaceholder(true)
+
 		val header = HeaderItem(context.getString(R.string.lbl_my_media))
 		val row = ListRow(header, rowAdapter)
 		rowAdapter.setRow(row)

@@ -21,6 +21,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import org.koin.androidx.viewmodel.ext.android.activityViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
@@ -109,11 +110,29 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	private var currentItem: BaseRowItem? = null
 	private var currentRow: ListRow? = null
 	private var justLoaded = true
+	private var selectedPreviewJob: Job? = null
 
 	// Special rows
 	private val notificationsRow by lazy { NotificationsHomeFragmentRow(lifecycleScope, notificationsRepository) }
 	private val nowPlaying by lazy { HomeFragmentNowPlayingRow(lifecycleScope, playbackManager, mediaManager) }
 	private val liveTVRow by lazy { HomeFragmentLiveTVRow(requireActivity(), userRepository, navigationRepository) }
+
+	private fun scheduleSelectedPreview(item: BaseRowItem) {
+		selectedPreviewJob?.cancel()
+		selectedPreviewJob = lifecycleScope.launch {
+			delay(160)
+			if (currentItem !== item) return@launch
+			backgroundService.setBackground(item.baseItem)
+			homePreviewViewModel.updateSelectedItem(item)
+		}
+	}
+
+	private fun clearSelectedPreview() {
+		selectedPreviewJob?.cancel()
+		selectedPreviewJob = null
+		backgroundService.clearBackgrounds()
+		homePreviewViewModel.updateSelectedItem(null)
+	}
 
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
@@ -497,6 +516,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	}
 
 	override fun onDestroy() {
+		selectedPreviewJob?.cancel()
 		verticalGridView?.setOnTouchListener(null)
 
 		super.onDestroy()
@@ -539,8 +559,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 
 				currentItem = null
 				currentRow = null
-				backgroundService.clearBackgrounds()
-				homePreviewViewModel.updateSelectedItem(null)
+				clearSelectedPreview()
 			} else {
 				currentItem = item
 				currentRow = row as ListRow
@@ -548,9 +567,9 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 				val itemRowAdapter = row.adapter as? ItemRowAdapter
 				itemRowAdapter?.loadMoreItemsIfNeeded(itemRowAdapter.indexOf(item))
 
-				backgroundService.setBackground(item.baseItem)
-				// Update preview
-				homePreviewViewModel.updateSelectedItem(item)
+				// Backgrounds and trailer previews are intentionally debounced. Without this, fast D-pad
+				// navigation decodes a large image and starts trailer discovery for every transient focus.
+				scheduleSelectedPreview(item)
 			}
 		}
 	}

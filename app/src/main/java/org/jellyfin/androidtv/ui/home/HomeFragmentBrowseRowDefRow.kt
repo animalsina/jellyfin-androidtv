@@ -37,6 +37,7 @@ class HomeFragmentBrowseRowDefRow(
 			else -> ItemRowAdapter(context, browseRowDef.query, browseRowDef.chunkSize, browseRowDef.preferParentThumb, browseRowDef.isStaticHeight, cardPresenter, rowsAdapter, browseRowDef.queryType)
 		}
 
+		rowAdapter.setSuppressEmptyPlaceholder(true)
 		rowAdapter.setReRetrieveTriggers(browseRowDef.changeTriggers)
 		val row = ListRow(header, rowAdapter)
 		rowAdapter.setRow(row)

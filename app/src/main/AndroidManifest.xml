@@ -41,6 +41,16 @@
                 android:host="youtube.com"
                 android:scheme="https" />
         </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+        <package android:name="tv.pluto.android" />
+        <package android:name="tv.pluto.androidtv" />
+        <package android:name="it.rainet.androidtv" />
+        <package android:name="it.rainet" />
+        <package android:name="com.amazon.amazonvideo.livingroom" />
+        <package android:name="com.amazon.avod.thirdpartyclient" />
     </queries>
 
     <application
