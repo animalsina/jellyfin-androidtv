@@ -273,9 +273,6 @@
     <string name="pref_clock_display_browsing">Imens du søger</string>
     <string name="lbl_always">Altid</string>
     <string name="pref_clock_display">Vis ur</string>
-    <string name="pref_default_rating">Standardvurderingstype</string>
-    <string name="lbl_tomatoes">Tomater</string>
-    <string name="lbl_stars">Stjerner</string>
     <string name="lbl_use_series_thumbnails">Foretræk miniaturebilleder fra serie</string>
     <string name="lbl_hide_unwatched_count">Når emnet er afspillet</string>
     <string name="pref_watched_indicator">Vis indikator for afspillet</string>
@@ -337,7 +334,6 @@
     <string name="pref_next_up_behavior_title">Vis info om næste video</string>
     <string name="pref_next_up_timeout_disabled">∞</string>
     <string name="lbl_subtitle_delay">Undertekstforsinkelse</string>
-    <string name="pref_show_backdrop_description">Ændr baggrundsbilledet til de valgte filer</string>
     <string name="lbl_playback_speed">Afspilningshastighed</string>
     <string name="lbl_fit">Normal</string>
     <string name="lbl_stretch">Stræk</string>
@@ -581,7 +577,6 @@
     <string name="lbl_still_watching_very_long">8 afsnit eller 240 minutter</string>
     <string name="pref_subtitles_background_opacity">Ugennemsigtighed af undertekstbaggrund</string>
     <string name="still_watching_label">Kigger du stadig med?</string>
-    <string name="preference_enable_libass">Aktiver Advanced SubStation Alpha-undertekster på klienten</string>
     <string name="speech_error_no_permission">Ingen tilladelse til at bruge mikrofonen. Tillad det venligst i systemindstillingerne.</string>
     <string name="speech_error_unavailable">Talegenkendelse er ikke tilgængelig på din enhed.</string>
     <string name="speech_error_unknown">En uventet fejl opstod under talegenkendelse.</string>
@@ -590,4 +585,7 @@
     <string name="pref_report_device_profile_success">Dokument indsendt som %1$s</string>
     <string name="pref_report_device_profile_failure">Det lykkedes ikke at sende dokumentet. Din Jellyfin-server tillader måske ikke indsendelse af klientlogge.</string>
     <string name="pref_subtitles_position">Afstand fra bunden</string>
+    <string name="playback_info">Afspilningsinformation</string>
+    <string name="playback_info_play_method">Afspilningsmetode: %1$s</string>
+    <string name="playback_info_transcoding">Transkodning</string>
 </resources>

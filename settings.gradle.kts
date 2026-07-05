@@ -18,6 +18,7 @@ rootProject.name = "jellyfin-androidtv"
 include(":app")
 
 // Modules
+include(":design")
 include(":playback:core")
 include(":playback:jellyfin")
 include(":playback:media3:exoplayer")

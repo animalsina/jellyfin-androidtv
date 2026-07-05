@@ -40,9 +40,11 @@ private fun createStreamInfo(
 			source.isRemote && source.path != null -> source.path
 			else -> api.videosApi.getVideoStreamUrl(
 				itemId = itemId,
+				container = container,
 				mediaSourceId = source.id,
 				static = true,
 				tag = source.eTag,
+				liveStreamId = source.liveStreamId,
 			)
 		}
 	} else if (options.enableDirectStream && source.supportsDirectStream) {
@@ -109,6 +111,7 @@ class PlaybackManager(
 					allowVideoStreamCopy = true,
 					allowAudioStreamCopy = true,
 					autoOpenLiveStream = true,
+					alwaysBurnInSubtitleWhenTranscoding = options.alwaysBurnInSubtitleWhenTranscoding,
 				)
 			).content
 		}

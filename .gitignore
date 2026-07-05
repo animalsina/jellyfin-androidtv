@@ -7,4 +7,4 @@ local.properties
 .kotlin/
 build/
 captures/
-.history_patches/*
+.history_patches/

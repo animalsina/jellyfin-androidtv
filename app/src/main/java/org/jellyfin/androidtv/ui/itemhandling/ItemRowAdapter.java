@@ -88,6 +88,7 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
     private List<org.jellyfin.sdk.model.api.BaseItemDto> mItems;
     private MutableObjectAdapter<Row> mParent;
     private ListRow mRow;
+    private Row siblingRow;
     private int chunkSize = 0;
 
     private int itemsLoaded = 0;
@@ -99,7 +100,6 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
 
     private boolean preferParentThumb = false;
     private boolean staticHeight = false;
-    private boolean suppressEmptyPlaceholder = false;
 
     private final Lazy<org.jellyfin.sdk.api.client.ApiClient> api = inject(org.jellyfin.sdk.api.client.ApiClient.class);
     private final Lazy<UserViewsRepository> userViewsRepository = inject(UserViewsRepository.class);
@@ -125,16 +125,16 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
         return staticHeight;
     }
 
-    public void setSuppressEmptyPlaceholder(boolean suppressEmptyPlaceholder) {
-        this.suppressEmptyPlaceholder = suppressEmptyPlaceholder;
-    }
-
     public QueryType getQueryType() {
         return queryType;
     }
 
     public void setRow(ListRow row) {
         mRow = row;
+    }
+
+    public void setSiblingRow(Row row) {
+        siblingRow = row;
     }
 
     public void setReRetrieveTriggers(ChangeTriggerType[] reRetrieveTriggers) {
@@ -456,7 +456,11 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
             return;
         }
 
-        if (mParent.size() == 1 && !suppressEmptyPlaceholder) {
+        if (siblingRow != null) {
+            mParent.remove(siblingRow);
+        }
+
+        if (mParent.size() == 1) {
             // we will be removing the last row - show something and prevent the framework from crashing
             // because there is nowhere for focus to land
             ArrayObjectAdapter emptyRow = new ArrayObjectAdapter(new TextItemPresenter());
@@ -473,18 +477,18 @@ public class ItemRowAdapter extends MutableObjectAdapter<Object> {
             return;
         }
         if (isCurrentlyRetrieving()) {
-            Timber.d("Not loading more because currently retrieving");
+            Timber.i("Not loading more because currently retrieving");
             return;
         }
         // This needs tobe based on the actual estimated cards on screen via type of presenter and WindowAlignmentOffsetPercent
         if (chunkSize > 0) {
             // we can use chunkSize as indicator on when to load
             if (pos >= (itemsLoaded - (chunkSize / 1.7))) {
-                Timber.d("Loading more items trigger pos <%s> itemsLoaded <%s> from total <%s> with chunkSize <%s>", pos, itemsLoaded, totalItems, chunkSize);
+                Timber.i("Loading more items trigger pos <%s> itemsLoaded <%s> from total <%s> with chunkSize <%s>", pos, itemsLoaded, totalItems, chunkSize);
                 retrieveNext();
             }
         } else if (pos >= itemsLoaded - 20) {
-            Timber.d("Loading more items trigger pos <%s> itemsLoaded <%s> from total <%s>", pos, itemsLoaded, totalItems);
+            Timber.i("Loading more items trigger pos <%s> itemsLoaded <%s> from total <%s>", pos, itemsLoaded, totalItems);
             retrieveNext();
         }
     }

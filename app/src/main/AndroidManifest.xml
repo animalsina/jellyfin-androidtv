@@ -13,7 +13,6 @@
         android:name="android.permission.ACCESS_WIFI_STATE"
         tools:ignore="LeanbackUsesWifi" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <!-- Search permissions (voice to text) -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
@@ -41,16 +40,11 @@
                 android:host="youtube.com"
                 android:scheme="https" />
         </intent>
+
         <intent>
             <action android:name="android.intent.action.VIEW" />
-            <data android:scheme="https" />
+            <data android:mimeType="video/*" />
         </intent>
-        <package android:name="tv.pluto.android" />
-        <package android:name="tv.pluto.androidtv" />
-        <package android:name="it.rainet.androidtv" />
-        <package android:name="it.rainet" />
-        <package android:name="com.amazon.amazonvideo.livingroom" />
-        <package android:name="com.amazon.avod.thirdpartyclient" />
     </queries>
 
     <application
@@ -63,22 +57,10 @@
         android:icon="@mipmap/app_icon"
         android:label="@string/app_name"
         android:largeHeap="true"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:supportsRtl="true"
         android:theme="@style/Theme.Jellyfin"
-        android:usesCleartextTraffic="true"
-        android:networkSecurityConfig="@xml/network_security_config">
-
-        <!-- Legacy service required for AccountManagerMigration -->
-        <service
-            android:name=".auth.service.AuthenticatorService"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.accounts.AccountAuthenticator" />
-            </intent-filter>
-            <meta-data
-                android:name="android.accounts.AccountAuthenticator"
-                android:resource="@xml/authenticator" />
-        </service>
+        android:usesCleartextTraffic="true">
 
         <!-- Screensaver -->
         <service
@@ -121,17 +103,6 @@
             android:exported="true"
             android:initOrder="10" />
 
-
-        <provider
-            android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.apkupdate.fileprovider"
-            android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/apk_update_file_paths" />
-        </provider>
-
         <!-- Authentication -->
         <activity
             android:name=".ui.startup.StartupActivity"
@@ -161,10 +132,6 @@
             android:name=".ui.browsing.MainActivity"
             android:launchMode="singleTask"
             android:windowSoftInputMode="adjustNothing" />
-
-        <activity
-            android:name=".ui.preference.PreferencesActivity"
-            android:theme="@style/Theme.Jellyfin.Preferences" />
 
         <activity android:name=".ui.playback.ExternalPlayerActivity" />
     </application>

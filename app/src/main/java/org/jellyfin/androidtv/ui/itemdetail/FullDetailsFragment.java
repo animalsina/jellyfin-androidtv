@@ -245,12 +245,12 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
                 // the third condition accounts for a situation where a sync (dataRefresh) coincides with the end of playback
                 if (lastPlaybackTime != null && (lastPlaybackTime.isAfter(mLastUpdated) || Instant.now().toEpochMilli() - lastPlaybackTime.toEpochMilli() < 2000) && mBaseItem.getType() != BaseItemKind.MUSIC_ARTIST) {
                     BaseItemDto lastPlayedItem = dataRefreshService.getValue().getLastPlayedItem();
-                    if (mBaseItem.getType() == BaseItemKind.EPISODE && lastPlayedItem != null && !mBaseItem.getId().equals(lastPlayedItem.getId().toString()) && lastPlayedItem.getType() == BaseItemKind.EPISODE) {
+                    if (mBaseItem.getType() == BaseItemKind.EPISODE && lastPlayedItem != null && !mBaseItem.getId().equals(lastPlayedItem.getId()) && lastPlayedItem.getType() == BaseItemKind.EPISODE) {
                         Timber.i("Re-loading after new episode playback");
                         loadItem(lastPlayedItem.getId());
                         dataRefreshService.getValue().setLastPlayedItem(null); //blank this out so a detail screen we back up to doesn't also do this
                     } else {
-                        Timber.d("Updating info after playback");
+                        Timber.i("Updating info after playback");
                         FullDetailsFragmentHelperKt.getItem(FullDetailsFragment.this, mBaseItem.getId(), item -> {
                             if (item == null) return null;
 
@@ -547,7 +547,7 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
 
                 //Chapters
                 if (mBaseItem.getChapters() != null && !mBaseItem.getChapters().isEmpty()) {
-                    List<ChapterItemInfo> chapters = BaseItemExtensionsKt.buildChapterItems(mBaseItem, api.getValue());
+                    List<ChapterItemInfo> chapters = BaseItemExtensionsKt.buildChapterItems(mBaseItem);
                     ItemRowAdapter chapterAdapter = new ItemRowAdapter(requireContext(), chapters, new CardPresenter(true, 120), adapter);
                     addItemRow(adapter, chapterAdapter, 2, getString(R.string.lbl_chapters));
                 }
@@ -612,6 +612,12 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
                 break;
 
             case EPISODE:
+                //Additional Parts
+                if (mBaseItem.getPartCount() != null && mBaseItem.getPartCount() > 0) {
+                    ItemRowAdapter additionalPartsAdapter = new ItemRowAdapter(requireContext(), new GetAdditionalPartsRequest(mBaseItem.getId()), new CardPresenter(), adapter);
+                    addItemRow(adapter, additionalPartsAdapter, 0, getString(R.string.lbl_additional_parts));
+                }
+
                 if (mBaseItem.getSeasonId() != null && mBaseItem.getIndexNumber() != null) {
                     // query index is zero-based but episode no is not
                     ItemRowAdapter nextAdapter = new ItemRowAdapter(requireContext(), BrowsingUtils.createNextEpisodesRequest(mBaseItem.getSeasonId(), mBaseItem.getIndexNumber()), 0, false, true, new CardPresenter(true, 120), adapter);
@@ -632,7 +638,7 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
 
                 //Chapters
                 if (mBaseItem.getChapters() != null && !mBaseItem.getChapters().isEmpty()) {
-                    List<ChapterItemInfo> chapters = BaseItemExtensionsKt.buildChapterItems(mBaseItem, api.getValue());
+                    List<ChapterItemInfo> chapters = BaseItemExtensionsKt.buildChapterItems(mBaseItem);
                     ItemRowAdapter chapterAdapter = new ItemRowAdapter(requireContext(), chapters, new CardPresenter(true, 120), adapter);
                     addItemRow(adapter, chapterAdapter, 1, getString(R.string.lbl_chapters));
                 }
@@ -713,9 +719,10 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
         BaseItemDto baseItem = mBaseItem;
         if (baseItem.getType() == BaseItemKind.AUDIO || baseItem.getType() == BaseItemKind.MUSIC_ALBUM || baseItem.getType() == BaseItemKind.MUSIC_ARTIST) {
             if (baseItem.getType() == BaseItemKind.MUSIC_ALBUM || baseItem.getType() == BaseItemKind.MUSIC_ARTIST) {
-                playbackHelper.getValue().getItemsToPlay(getContext(), baseItem, false, false, new Response<List<BaseItemDto>>() {
+                playbackHelper.getValue().getItemsToPlay(getContext(), baseItem, false, false, new Response<List<BaseItemDto>>(getLifecycle()) {
                     @Override
                     public void onResponse(List<BaseItemDto> response) {
+                        if (!isActive()) return;
                         mediaManager.getValue().addToAudioQueue(response);
                     }
                 });
@@ -995,22 +1002,20 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
             mDetailsOverviewRow.addAction(goToSeriesButton);
         }
 
-        if (userPreferences.getValue().get(UserPreferences.Companion.getMediaManagementEnabled())) {
-            boolean deletableItem = false;
-            UserDto currentUser = KoinJavaComponent.<UserRepository>get(UserRepository.class).getCurrentUser().getValue();
-            if (mBaseItem.getType() == BaseItemKind.RECORDING && currentUser.getPolicy().getEnableLiveTvManagement() && mBaseItem.getCanDelete() != null)
-                deletableItem = mBaseItem.getCanDelete();
-            else if (mBaseItem.getCanDelete() != null) deletableItem = mBaseItem.getCanDelete();
+        boolean deletableItem = false;
+        UserDto currentUser = KoinJavaComponent.<UserRepository>get(UserRepository.class).getCurrentUser().getValue();
+        if (mBaseItem.getType() == BaseItemKind.RECORDING && currentUser.getPolicy().getEnableLiveTvManagement() && mBaseItem.getCanDelete() != null)
+            deletableItem = mBaseItem.getCanDelete();
+        else if (mBaseItem.getCanDelete() != null) deletableItem = mBaseItem.getCanDelete();
 
-            if (deletableItem) {
-                deleteButton = TextUnderButton.create(requireContext(), R.drawable.ic_delete, buttonSize, 0, getString(R.string.lbl_delete), new View.OnClickListener() {
-                    @Override
-                    public void onClick(View v) {
-                        deleteItem();
-                    }
-                });
-                mDetailsOverviewRow.addAction(deleteButton);
-            }
+        if (deletableItem) {
+            deleteButton = TextUnderButton.create(requireContext(), R.drawable.ic_delete, buttonSize, 0, getString(R.string.lbl_delete), new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    deleteItem();
+                }
+            });
+            mDetailsOverviewRow.addAction(deleteButton);
         }
 
         if (mSeriesTimerInfo != null) {
@@ -1213,9 +1218,10 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
     }
 
     void play(final BaseItemDto item, final int pos, final boolean shuffle) {
-        playbackHelper.getValue().getItemsToPlay(getContext(), item, pos == 0 && item.getType() == BaseItemKind.MOVIE, shuffle, new Response<List<BaseItemDto>>() {
+        playbackHelper.getValue().getItemsToPlay(getContext(), item, pos == 0 && item.getType() == BaseItemKind.MOVIE, shuffle, new Response<List<BaseItemDto>>(getLifecycle()) {
             @Override
             public void onResponse(List<BaseItemDto> response) {
+                if (!isActive()) return;
                 if (response.isEmpty()) {
                     Timber.e("No items to play - ignoring play request.");
                     return;
