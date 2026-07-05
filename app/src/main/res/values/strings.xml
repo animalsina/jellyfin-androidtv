@@ -648,4 +648,21 @@
     <string name="lbl_talk_show">Talk Show</string>
     <string name="lbl_more_info">More Info</string>
 
+
+    <string name="apk_update_available_title">APK update available</string>
+    <string name="apk_update_available_message">Current version: %1$s
+New version: %2$s
+
+File: %3$s
+
+Do you want to download and install it?</string>
+    <string name="apk_update_install">Download and install</string>
+    <string name="apk_update_later">Not now</string>
+    <string name="apk_update_permission_title">Allow APK updates</string>
+    <string name="apk_update_permission_message">Android requires permission to install APK files from this app. Enable the permission, then reopen the app to install the update.</string>
+    <string name="apk_update_open_settings">Open settings</string>
+    <string name="apk_update_failed_title">Update failed</string>
+    <string name="apk_update_failed_message">The APK update could not be downloaded or opened. Check the connection and try again later.</string>
+    <string name="apk_update_download_complete_description">SuperJelly TV APK update</string>
+
 </resources>

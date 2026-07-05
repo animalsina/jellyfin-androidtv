@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.0.12 - 2026-07-05
+
+- Aggiunto controllo automatico degli aggiornamenti APK dalla cartella remota predefinita `https://files.animalsina.work/jellyfin/android-tv/`.
+- Il client confronta la versione installata con i file `jellyfin-androidtv-vX.Y.Z-debug.apk` disponibili online e propone l’installazione solo quando trova una versione più recente.
+- Aggiunto flusso guidato con modale: download dell’APK, richiesta permesso Android per installare APK da questa app e apertura dell’installer di sistema.
+- L’aggiornamento resta volontario: nessuna installazione silenziosa, nessun cambio player e nessuna modifica ai provider esterni.
+
 ## v1.0.11
 
 - Migliorata la configurazione di build: Gradle ora può risolvere automaticamente il toolchain Java 21 richiesto dal progetto quando non è installato localmente.
