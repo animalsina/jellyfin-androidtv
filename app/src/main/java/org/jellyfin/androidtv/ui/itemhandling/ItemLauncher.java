@@ -56,13 +56,13 @@ public class ItemLauncher {
                 LibraryPreferences displayPreferences = preferencesRepository.getValue().getLibraryPreferences(baseItem.getDisplayPreferencesId());
                 boolean enableSmartScreen = displayPreferences.get(LibraryPreferences.Companion.getEnableSmartScreen());
 
-                if (!enableSmartScreen) return Destinations.INSTANCE.libraryBrowser(baseItem);
+                if (!enableSmartScreen) return Destinations.INSTANCE.libraryBrowser(baseItem, null);
                 else return Destinations.INSTANCE.librarySmartScreen(baseItem);
             case MUSIC:
             case LIVETV:
                 return Destinations.INSTANCE.librarySmartScreen(baseItem);
             default:
-                return Destinations.INSTANCE.libraryBrowser(baseItem);
+                return Destinations.INSTANCE.libraryBrowser(baseItem, null);
         }
     }
 
@@ -71,7 +71,7 @@ public class ItemLauncher {
             case BaseItem:
                 BaseItemDto baseItem = rowItem.getBaseItem();
                 try {
-                    Timber.d("Item selected: %s (%s)", baseItem.getName(), baseItem.getType().toString());
+                    Timber.i("Item selected: %s (%s)", baseItem.getName(), baseItem.getType().toString());
                 } catch (Exception e) {
                     //swallow it
                 }
@@ -147,7 +147,7 @@ public class ItemLauncher {
                         baseItem = JavaCompat.copyWithDisplayPreferencesId(baseItem, baseItem.getId().toString());
                     }
 
-                    navigationRepository.getValue().navigate(Destinations.INSTANCE.libraryBrowser(baseItem));
+                    navigationRepository.getValue().navigate(Destinations.INSTANCE.libraryBrowser(baseItem, null));
                 } else {
                     switch (rowItem.getSelectAction()) {
 
@@ -159,6 +159,7 @@ public class ItemLauncher {
                             playbackHelper.getValue().getItemsToPlay(context, baseItem, baseItem.getType() == BaseItemKind.MOVIE, false, new Response<List<BaseItemDto>>() {
                                 @Override
                                 public void onResponse(List<BaseItemDto> response) {
+                                    if (!isActive()) return;
                                     playbackLauncher.getValue().launch(context, response);
                                 }
                             });
@@ -176,6 +177,7 @@ public class ItemLauncher {
                 ItemLauncherHelper.getItem(rowItem.getItemId(), new Response<BaseItemDto>() {
                     @Override
                     public void onResponse(BaseItemDto response) {
+                        if (!isActive()) return;
                         List<BaseItemDto> items = new ArrayList<>(1);
                         items.add(response);
                         Long start = chapter.getStartPositionTicks() / 10000;
@@ -197,6 +199,7 @@ public class ItemLauncher {
                         ItemLauncherHelper.getItem(program.getChannelId(), new Response<BaseItemDto>() {
                             @Override
                             public void onResponse(BaseItemDto response) {
+                                if (!isActive()) return;
                                 List<BaseItemDto> items = new ArrayList<>(1);
                                 items.add(response);
                                 playbackLauncher.getValue().launch(context, items);
@@ -212,9 +215,11 @@ public class ItemLauncher {
                 ItemLauncherHelper.getItem(channel.getId(), new Response<BaseItemDto>() {
                     @Override
                     public void onResponse(BaseItemDto response) {
+                        if (!isActive()) return;
                         playbackHelper.getValue().getItemsToPlay(context, response, false, false, new Response<List<BaseItemDto>>() {
                             @Override
                             public void onResponse(List<BaseItemDto> response) {
+                                if (!isActive()) return;
                                 playbackLauncher.getValue().launch(context, response);
                             }
                         });
@@ -233,6 +238,7 @@ public class ItemLauncher {
                         ItemLauncherHelper.getItem(rowItem.getBaseItem().getId(), new Response<BaseItemDto>() {
                             @Override
                             public void onResponse(BaseItemDto response) {
+                                if (!isActive()) return;
                                 List<BaseItemDto> items = new ArrayList<>(1);
                                 items.add(response);
                                 playbackLauncher.getValue().launch(context, items);

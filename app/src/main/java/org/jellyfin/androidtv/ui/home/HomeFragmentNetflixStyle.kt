@@ -45,11 +45,14 @@ import org.jellyfin.androidtv.ui.navigation.ActivityDestinations
 import org.jellyfin.androidtv.ui.navigation.Destinations
 import org.jellyfin.androidtv.ui.navigation.NavigationRepository
 import org.jellyfin.androidtv.ui.playback.MediaManager
+import org.jellyfin.androidtv.ui.settings.compat.SettingsViewModel
 import org.jellyfin.androidtv.ui.startup.StartupActivity
 import org.jellyfin.androidtv.util.ImageHelper
+import org.jellyfin.androidtv.util.apiclient.getUrl
 import org.jellyfin.androidtv.util.apiclient.itemBackdropImages
 import org.jellyfin.androidtv.util.apiclient.itemImages
 import org.jellyfin.androidtv.util.apiclient.parentBackdropImages
+import org.jellyfin.androidtv.util.apiclient.primaryImage
 import org.jellyfin.androidtv.util.apiclient.seriesThumbImage
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
@@ -65,6 +68,7 @@ import java.net.URLEncoder
 
 
 class HomeFragmentNetflixStyle : Fragment() {
+	private val api by inject<org.jellyfin.sdk.api.client.ApiClient>()
 	private val sessionRepository by inject<SessionRepository>()
 	private val userRepository by inject<UserRepository>()
 	private val serverRepository by inject<ServerRepository>()
@@ -75,6 +79,7 @@ class HomeFragmentNetflixStyle : Fragment() {
 	private val userViewsRepository by inject<UserViewsRepository>()
 	private val itemLauncher by inject<ItemLauncher>()
 	private val homePreviewViewModel: HomePreviewViewModel by activityViewModel()
+	private val settingsViewModel: SettingsViewModel by activityViewModel()
 
 	// View references
 	private lateinit var previewBackground: AsyncImageView
@@ -200,7 +205,7 @@ class HomeFragmentNetflixStyle : Fragment() {
 		}
 
 		if (backdropImage != null) {
-			val backdropUrl = imageHelper.getImageUrl(backdropImage)
+			val backdropUrl = backdropImage.getUrl(api)
 
 			// Load image with a callback to show views only after loading
 			previewBackground.doOnAttach {
@@ -349,7 +354,7 @@ class HomeFragmentNetflixStyle : Fragment() {
 		lifecycleScope.launch {
 			userRepository.currentUser.filterNotNull().collect { user ->
 				user.let {
-					val imageUrl = imageHelper.getPrimaryImageUrl(it)
+					val imageUrl = it.primaryImage?.getUrl(api)
 					userAvatar?.load(imageUrl)
 				}
 			}
@@ -477,7 +482,7 @@ class HomeFragmentNetflixStyle : Fragment() {
 			isClickable = true
 
 			setOnClickListener {
-				startActivity(ActivityDestinations.userPreferences(requireContext()))
+				settingsViewModel.show()
 			}
 		}
 	}
@@ -519,7 +524,7 @@ class HomeFragmentNetflixStyle : Fragment() {
 		val showsTab = createStaticTab(ctx.getString(R.string.lbl_tv_show)) { navigateToLibraryType(CollectionType.TVSHOWS) }
 		val playlistsTab = createStaticTab(ctx.getString(R.string.lbl_playlists)) { navigateToLibraryType(CollectionType.PLAYLISTS) }
 		val jellyfinTab =
-			createStaticTab(ctx.getString(R.string.lbl_jellyfin)) { startActivity(ActivityDestinations.userPreferences(requireContext())) }
+			createStaticTab(ctx.getString(R.string.lbl_jellyfin)) { settingsViewModel.show() }
 
 		navContainer?.addView(moviesTab)
 		navContainer?.addView(showsTab)

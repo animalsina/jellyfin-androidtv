@@ -1,9 +1,8 @@
 plugins {
-	id("com.android.application")
-	kotlin("android")
-	alias(libs.plugins.kotlin.serialization)
-	alias(libs.plugins.kotlin.compose)
 	alias(libs.plugins.aboutlibraries)
+	alias(libs.plugins.android.application)
+	alias(libs.plugins.kotlin.compose)
+	alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -24,15 +23,39 @@ android {
 		buildConfig = true
 		viewBinding = true
 		compose = true
+		resValues = true
 	}
 
 	compileOptions {
 		isCoreLibraryDesugaringEnabled = true
 	}
 
+	signingConfigs {
+		val keystoreFile = getProperty("keystore.file")
+		val keystorePassword = getProperty("keystore.password")
+		val signingKeyAlias = getProperty("signing.key.alias")
+		val signingKeyPassword = getProperty("signing.key.password")
+
+		if (keystoreFile != null && keystorePassword != null && signingKeyAlias != null && signingKeyPassword != null) {
+			create("release") {
+				storeFile = file(keystoreFile)
+				storePassword = keystorePassword
+				keyAlias = signingKeyAlias
+				keyPassword = signingKeyPassword
+			}
+		}
+	}
+
+	dependenciesInfo {
+		includeInBundle = false
+		includeInApk = false
+	}
+
 	buildTypes {
 		release {
-			isMinifyEnabled = false
+			isMinifyEnabled = true
+			isShrinkResources = true
+			proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
 
 			// Set package names used in various XML files
 			resValue("string", "app_id", namespace!!)
@@ -43,6 +66,8 @@ android {
 			resValue("string", "app_name", "@string/app_name_release")
 
 			buildConfigField("boolean", "DEVELOPMENT", "false")
+
+			signingConfig = signingConfigs.findByName("release")
 		}
 
 		debug {
@@ -73,7 +98,7 @@ android {
 	}
 
 	packaging {
-		// Exclude libass libraries to fix 16KB page size alignment warning  
+		// Exclude libass libraries to fix 16KB page size alignment warning
 		// This will disable ASS subtitle support until the library is updated
 		jniLibs {
 			excludes += listOf("**/libass.so", "**/libasskt.so")
@@ -95,6 +120,7 @@ tasks.register("versionTxt") {
 
 dependencies {
 	// Jellyfin
+	implementation(projects.design)
 	implementation(projects.playback.core)
 	implementation(projects.playback.jellyfin)
 	implementation(projects.playback.media3.exoplayer)
@@ -122,6 +148,7 @@ dependencies {
 	implementation(libs.androidx.fragment.compose)
 	implementation(libs.androidx.leanback.core)
 	implementation(libs.androidx.leanback.preference)
+	implementation(libs.androidx.navigation3.ui)
 	implementation(libs.androidx.preference)
 	implementation(libs.androidx.appcompat)
 	implementation(libs.androidx.tvprovider)

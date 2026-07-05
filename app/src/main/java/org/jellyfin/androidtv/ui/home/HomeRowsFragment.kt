@@ -30,18 +30,22 @@ import kotlinx.coroutines.withTimeout
 import org.jellyfin.androidtv.auth.repository.UserRepository
 import org.jellyfin.androidtv.constant.CustomMessage
 import org.jellyfin.androidtv.constant.HomeSectionType
+import org.jellyfin.androidtv.constant.LiveTvOption
+import org.jellyfin.androidtv.constant.QueryType
 import org.jellyfin.androidtv.data.model.DataRefreshService
 import org.jellyfin.androidtv.data.repository.CustomMessageRepository
 import org.jellyfin.androidtv.data.repository.NotificationsRepository
 import org.jellyfin.androidtv.data.repository.UserViewsRepository
 import org.jellyfin.androidtv.data.service.BackgroundService
 import org.jellyfin.androidtv.preference.UserSettingPreferences
+import org.jellyfin.androidtv.ui.GridButton
 import org.jellyfin.androidtv.ui.browsing.CompositeClickedListener
 import org.jellyfin.androidtv.ui.browsing.CompositeSelectedListener
 import org.jellyfin.androidtv.ui.itemhandling.BaseRowItem
 import org.jellyfin.androidtv.ui.itemhandling.ItemLauncher
 import org.jellyfin.androidtv.ui.itemhandling.ItemRowAdapter
 import org.jellyfin.androidtv.ui.itemhandling.refreshItem
+import org.jellyfin.androidtv.ui.navigation.Destinations
 import org.jellyfin.androidtv.ui.navigation.NavigationRepository
 import org.jellyfin.androidtv.ui.playback.AudioEventListener
 import org.jellyfin.androidtv.ui.playback.MediaManager
@@ -86,7 +90,6 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	// Special rows
 	private val notificationsRow by lazy { NotificationsHomeFragmentRow(lifecycleScope, notificationsRepository) }
 	private val nowPlaying by lazy { HomeFragmentNowPlayingRow(lifecycleScope, playbackManager, mediaManager) }
-	private val liveTVRow by lazy { HomeFragmentLiveTVRow(requireActivity(), userRepository, navigationRepository) }
 
 	override fun onCreate(savedInstanceState: Bundle?) {
 		super.onCreate(savedInstanceState)
@@ -98,7 +101,6 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 
 		onItemViewClickedListener = CompositeClickedListener().apply {
 			registerListener(ItemViewClickedListener())
-			registerListener(liveTVRow::onItemClicked)
 			registerListener(notificationsRow::onItemClicked)
 		}
 
@@ -150,12 +152,12 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 			var includeLiveTvRows = false
 
 			if (homeSections.contains(HomeSectionType.LIVE_TV) && currentUser.policy?.enableLiveTvAccess == true) {
-				val recommendedPrograms by api.liveTvApi.getRecommendedPrograms(
+				val recommendedPrograms = api.liveTvApi.getRecommendedPrograms(
 					enableTotalRecordCount = false,
 					imageTypeLimit = 1,
 					isAiring = true,
 					limit = 1,
-				)
+				).content
 				includeLiveTvRows = recommendedPrograms.items.isNotEmpty()
 			}
 
@@ -210,7 +212,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 			HomeSectionType.RESUME_AUDIO -> helper.loadResumeAudio()
 			HomeSectionType.ACTIVE_RECORDINGS -> helper.loadLatestLiveTvRecordings()
 			HomeSectionType.NEXT_UP -> helper.loadNextUp()
-			HomeSectionType.LIVE_TV -> if (includeLiveTvRows) liveTVRow else null
+			HomeSectionType.LIVE_TV -> if (includeLiveTvRows) HomeFragmentLiveTVRow(requireActivity(), userRepository) else null
 			HomeSectionType.RECOMMENDED_FOR_YOU -> helper.loadRecommendedForYou(userViewsRepository.views.first())
 			HomeSectionType.TRENDING_THIS_WEEK -> helper.loadTrendingThisWeek(userViewsRepository.views.first())
 			HomeSectionType.RECENTLY_RELEASED -> helper.loadRecentlyReleased(userViewsRepository.views.first())
@@ -284,7 +286,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 		val adapter = currentRow?.adapter as? ItemRowAdapter ?: return
 		val item = currentItem ?: return
 
-		Timber.d("Refresh item ${item.getFullName(requireContext())}")
+		Timber.i("Refresh item ${item.getFullName(requireContext())}")
 		adapter.refreshItem(api, this, item)
 	}
 
@@ -301,6 +303,15 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 			rowViewHolder: RowPresenter.ViewHolder?,
 			row: Row?,
 		) {
+			if (item is GridButton) {
+				when (item.id) {
+					LiveTvOption.LIVE_TV_GUIDE_OPTION_ID -> navigationRepository.navigate(Destinations.liveTvGuide)
+					LiveTvOption.LIVE_TV_SCHEDULE_OPTION_ID -> navigationRepository.navigate(Destinations.liveTvSchedule)
+					LiveTvOption.LIVE_TV_RECORDINGS_OPTION_ID -> navigationRepository.navigate(Destinations.liveTvRecordings)
+					LiveTvOption.LIVE_TV_SERIES_OPTION_ID -> navigationRepository.navigate(Destinations.liveTvSeriesRecordings)
+				}
+			}
+
 			if (item !is BaseRowItem) return
 			if (row !is ListRow) return
 			@Suppress("UNCHECKED_CAST")

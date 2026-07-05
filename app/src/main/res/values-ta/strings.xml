@@ -262,9 +262,6 @@
     <string name="lbl_playback_control_ends">%1$s இல் முடிகிறது</string>
     <string name="lbl_sign_in">உள்நுழையவும்</string>
     <string name="watch_count_overflow">99+</string>
-    <string name="pref_default_rating">இயல்புநிலை மதிப்பீட்டு வகை</string>
-    <string name="lbl_tomatoes">தக்காளி</string>
-    <string name="lbl_stars">நட்சத்திரங்கள்</string>
     <string name="pref_clock_display_playback">பின்னணி போது</string>
     <string name="pref_clock_display_browsing">உலாவும்போது</string>
     <string name="lbl_always">எப்போதும்</string>
@@ -403,7 +400,6 @@
     <string name="pref_subtitles_background_title">பின்னணியை இயக்கு</string>
     <string name="server_connection_failed_candidates">சேவையகத்துடன் இணைக்க முடியவில்லை, பின்வரும் முகவரிகளை முயற்சித்தேன்: %1$s</string>
     <string name="pref_next_up_timeout_disabled">∞</string>
-    <string name="pref_show_backdrop_description">தேர்ந்தெடுக்கப்பட்ட உருப்படிகளுக்கு பின்னணி படத்தை மாற்றவும்</string>
     <string name="lbl_playback_speed">பின்னணி வேகம்</string>
     <string name="home_section_resume_book">தொடர்ந்து படி</string>
     <string name="lbl_shuffle_queue">ஷஃபிளை நிலைமாற்று</string>
@@ -485,8 +481,8 @@
         <item quantity="other">%1$s வினாடிகள்</item>
     </plurals>
     <plurals name="hours">
-        <item quantity="one">%1$s மணிநேரம்</item>
-        <item quantity="other">%1$s மணிநேரம்</item>
+        <item quantity="one">%1$s மணி</item>
+        <item quantity="other">%1$s மணிகள்</item>
     </plurals>
     <string name="episode_name_special">பிரத்யேகமான</string>
     <string name="channels">சேனல்கள்</string>
@@ -560,7 +556,6 @@
     <string name="pref_report_device_profile_summary">பிளேபேக் திறன்கள் பற்றிய தகவலுடன் ஒரு சரிசெய்தல் ஆவணத்தை ஜெல்லிஃபின் சேவையகத்தில் பதிவேற்றவும்</string>
     <string name="pref_report_device_profile_success">ஆவணம் %1$s ஆக சமர்ப்பிக்கப்பட்டது</string>
     <string name="pref_report_device_profile_failure">ஆவணத்தைச் சமர்ப்பிக்க முடியவில்லை. உங்கள் ஜெல்லிஃபின் சேவையகம் கிளையன்ட் பதிவுகளைத் தடைசெய்யக்கூடும்.</string>
-    <string name="preference_enable_libass">மேம்பட்ட துணைநிலைய ஆல்பா துணைத்தலைப்பு கிளையன்ட் ரெண்டரிங்கை இயக்கு</string>
     <string name="preference_enable_pgs">நேரடி நாடகம் PGS வசனங்கள்</string>
     <string name="speech_error_unknown">பேச்சு அறிதலின் போது எதிர்பாராத பிழை ஏற்பட்டது.</string>
     <string name="default_video_zoom">இயல்புநிலை ஜூம் பயன்முறை</string>
@@ -588,4 +583,9 @@
     <string name="lbl_still_watching_very_long">8 எபிசோடுகள் அல்லது 240 நிமிடங்கள்</string>
     <string name="fast_forward">முன்னோக்கி செல்</string>
     <string name="still_watching_label">நீங்க இன்னும் பார்த்துட்டு இருக்கீங்களா?</string>
+    <string name="pref_subtitles_position">கீழிருந்து ஆஃப்செட்</string>
+    <string name="settings">அமைப்பு</string>
+    <string name="settings_description">உங்கள் விருப்பப்படி பயன்பாட்டை மாற்றவும்</string>
+    <string name="copied_to_clipboard">கிளிப்போர்டுக்கு நகலெடுக்கப்பட்டது</string>
+    <string name="pref_playback_next_up">அடுத்து வருவது</string>
 </resources>
