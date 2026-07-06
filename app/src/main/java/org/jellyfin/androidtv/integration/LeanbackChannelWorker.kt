@@ -128,7 +128,7 @@ class LeanbackChannelWorker(
 	private data class HomeSectionChannel(
 		val key: String,
 		val title: String,
-		val items: List<BaseItemDto>,
+		val items: List<Any>,
 	)
 
 	private data class ExternalCatalogChannel(
@@ -255,9 +255,16 @@ class LeanbackChannelWorker(
 						.build()
 				)
 				if (channel != null) {
+					val contentValues = channelData.items.mapNotNull { item ->
+						when (item) {
+							is BaseItemDto -> createPreviewProgram(channel, item, preferParentThumb)
+							is ExternalCatalogItem -> createExternalPreviewProgram(channel, item)
+							else -> null
+						}
+					}.toTypedArray()
 					context.contentResolver.bulkInsert(
 						TvContractCompat.PreviewPrograms.CONTENT_URI,
-						channelData.items.map { item -> createPreviewProgram(channel, item, preferParentThumb) }.toTypedArray()
+						contentValues
 					)
 				}
 			}
@@ -356,8 +363,7 @@ class LeanbackChannelWorker(
 		val userViews = runCatching { userViewsRepository.views.first() }.getOrDefault(emptyList())
 		val configuredSections = userSettingPreferences.activeHomesections
 		val allProgramSections = HomeSectionType.entries
-			.filterNot { it == HomeSectionType.NONE || it == HomeSectionType.ONLINE_NEW_RELEASES || it.isExternalCatalogSection() }
-			.filterNot { it == HomeSectionType.RESUME_BOOK || it == HomeSectionType.LIVE_TV }
+			.filterNot { it == HomeSectionType.NONE || it == HomeSectionType.ONLINE_NEW_RELEASES }
 		val sectionChannels = (configuredSections + allProgramSections)
 			.distinct()
 			.mapNotNull { section ->
@@ -371,7 +377,7 @@ class LeanbackChannelWorker(
 		sectionChannels + getGenreProjectivyChannels(userViews)
 	}
 
-	private suspend fun loadItemsForHomeSection(section: HomeSectionType, userViews: Collection<BaseItemDto>): List<BaseItemDto> = when (section) {
+	private suspend fun loadItemsForHomeSection(section: HomeSectionType, userViews: Collection<BaseItemDto>): List<Any> = when (section) {
 		HomeSectionType.LATEST_MEDIA -> api.userLibraryApi.getLatestMedia(
 			fields = ItemRepository.itemFields,
 			limit = PROJECTIVY_CHANNEL_ITEM_LIMIT,
@@ -426,27 +432,71 @@ class LeanbackChannelWorker(
 			sortOrder = listOf(SortOrder.ASCENDING),
 			isPlayed = true,
 		)
-		HomeSectionType.SIMILAR_TO_WATCHED,
-		HomeSectionType.GENRE_RANDOM_MOVIES,
-		HomeSectionType.GENRE_RANDOM_TV,
-		HomeSectionType.GENRE_RANDOM_MIXED,
-		HomeSectionType.MOOD_LIGHT,
-		HomeSectionType.MOOD_ACTION,
-		HomeSectionType.MOOD_SHORT -> queryMovieSeries(userViews, listOf(ItemSortBy.RANDOM), isPlayed = false)
-		HomeSectionType.LIVE_TV,
-		HomeSectionType.RESUME_BOOK,
-		HomeSectionType.EXTERNAL_PROVIDERS,
-		HomeSectionType.PLUTO_ACTION,
-		HomeSectionType.PLUTO_COMEDY,
-		HomeSectionType.PLUTO_DRAMA,
-		HomeSectionType.PLUTO_THRILLER,
-		HomeSectionType.PLUTO_DOCUMENTARY,
-		HomeSectionType.PLUTO_SCIFI,
-		HomeSectionType.RAIPLAY_FILM,
-		HomeSectionType.RAIPLAY_SERIES,
-		HomeSectionType.ONLINE_NEW_RELEASES,
+		HomeSectionType.SIMILAR_TO_WATCHED -> queryMovieSeries(
+			userViews,
+			listOf(ItemSortBy.RANDOM),
+			minCommunityRating = 6.0,
+			isPlayed = false
+		)
+		HomeSectionType.GENRE_RANDOM_MOVIES -> queryMovieSeries(
+			userViews,
+			listOf(ItemSortBy.RANDOM),
+			includeTypes = listOf(BaseItemKind.MOVIE),
+			isPlayed = false
+		)
+		HomeSectionType.GENRE_RANDOM_TV -> queryMovieSeries(
+			userViews,
+			listOf(ItemSortBy.RANDOM),
+			includeTypes = listOf(BaseItemKind.SERIES),
+			isPlayed = false
+		)
+		HomeSectionType.GENRE_RANDOM_MIXED -> queryMovieSeries(
+			userViews,
+			listOf(ItemSortBy.RANDOM),
+			isPlayed = false
+		)
+		HomeSectionType.MOOD_LIGHT -> queryMovieSeries(
+			userViews,
+			listOf(ItemSortBy.RANDOM),
+			genres = listOf("Comedy", "Family", "Animation"),
+			minCommunityRating = 6.0
+		)
+		HomeSectionType.MOOD_ACTION -> queryMovieSeries(
+			userViews,
+			listOf(ItemSortBy.RANDOM),
+			genres = listOf("Action", "Adventure", "Thriller"),
+			minCommunityRating = 6.0
+		)
+		HomeSectionType.MOOD_SHORT -> queryMovieSeries(
+			userViews,
+			listOf(ItemSortBy.RANDOM),
+			includeTypes = listOf(BaseItemKind.MOVIE),
+			isPlayed = false
+		)
+		HomeSectionType.LIVE_TV -> api.liveTvApi.getRecommendedPrograms(
+			isAiring = true,
+			fields = ItemRepository.itemFields,
+			limit = PROJECTIVY_CHANNEL_ITEM_LIMIT
+		).content.items.orEmpty()
+		HomeSectionType.RESUME_BOOK -> api.itemsApi.getResumeItems(
+			GetResumeItemsRequest(
+				limit = PROJECTIVY_CHANNEL_ITEM_LIMIT,
+				fields = ItemRepository.itemFields,
+				mediaTypes = listOf(MediaType.AUDIO),
+				includeItemTypes = listOf(BaseItemKind.AUDIO_BOOK)
+			)
+		).content.items.orEmpty()
+		HomeSectionType.EXTERNAL_PROVIDERS -> externalCatalogRepository.loadHomeCatalog(limit = PROJECTIVY_CHANNEL_ITEM_LIMIT)
+		HomeSectionType.PLUTO_ACTION -> externalCatalogRepository.loadCatalogByGroup("pluto-tv", listOf("action", "azione", "avventura"), PROJECTIVY_CHANNEL_ITEM_LIMIT)
+		HomeSectionType.PLUTO_COMEDY -> externalCatalogRepository.loadCatalogByGroup("pluto-tv", listOf("comedy", "commedia", "comedie"), PROJECTIVY_CHANNEL_ITEM_LIMIT)
+		HomeSectionType.PLUTO_DRAMA -> externalCatalogRepository.loadCatalogByGroup("pluto-tv", listOf("drama", "drammatico", "drama"), PROJECTIVY_CHANNEL_ITEM_LIMIT)
+		HomeSectionType.PLUTO_THRILLER -> externalCatalogRepository.loadCatalogByGroup("pluto-tv", listOf("thriller", "crime", "giallo"), PROJECTIVY_CHANNEL_ITEM_LIMIT)
+		HomeSectionType.PLUTO_DOCUMENTARY -> externalCatalogRepository.loadCatalogByGroup("pluto-tv", listOf("documentary", "documentari", "doc"), PROJECTIVY_CHANNEL_ITEM_LIMIT)
+		HomeSectionType.PLUTO_SCIFI -> externalCatalogRepository.loadCatalogByGroup("pluto-tv", listOf("sci fi", "fantascienza", "science fiction"), PROJECTIVY_CHANNEL_ITEM_LIMIT)
+		HomeSectionType.RAIPLAY_FILM -> externalCatalogRepository.loadRaiPlayCatalog(ExternalCatalogRepository.RaiPlayKind.FILM, PROJECTIVY_CHANNEL_ITEM_LIMIT)
+		HomeSectionType.RAIPLAY_SERIES -> externalCatalogRepository.loadRaiPlayCatalog(ExternalCatalogRepository.RaiPlayKind.SERIES, PROJECTIVY_CHANNEL_ITEM_LIMIT)
+		HomeSectionType.ONLINE_NEW_RELEASES -> externalCatalogRepository.loadNewReleases(limit = PROJECTIVY_CHANNEL_ITEM_LIMIT)
 		HomeSectionType.NONE -> emptyList()
-		else -> emptyList()
 	}
 
 	private suspend fun queryMovieSeries(
