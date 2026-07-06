@@ -190,9 +190,13 @@ class ApkUpdateManager(private val activity: FragmentActivity) {
 				val current = Version.parse(BuildConfig.VERSION_NAME)
 				val latest = APK_FILE_REGEX.findAll(body)
 					.mapNotNull { match ->
-						val fileName = match.value.substringAfterLast('/')
-						val version = match.groupValues.getOrNull(1).orEmpty()
-						if (!fileName.endsWith(".apk", ignoreCase = true)) return@mapNotNull null
+						val fileName = match.groupValues.getOrNull(1)
+							?.substringAfterLast('/')
+							?.trim()
+							?.trim('\"', '\'')
+							.orEmpty()
+						val version = match.groupValues.getOrNull(2).orEmpty()
+						if (!fileName.endsWith(".apk", ignoreCase = true) || version.isBlank()) return@mapNotNull null
 						RemoteApk(
 							version = version,
 							fileName = fileName,
@@ -286,7 +290,7 @@ class ApkUpdateManager(private val activity: FragmentActivity) {
 		private const val NETWORK_TIMEOUT_MS = 8_000
 		private const val DOWNLOAD_TIMEOUT_MS = 30_000
 		private const val APK_MIME_TYPE = "application/vnd.android.package-archive"
-		private val APK_FILE_REGEX = Regex("(?:jellyfin|superjelly)-androidtv-v([0-9]+\\.[0-9]+\\.[0-9]+)-debug\\.apk", RegexOption.IGNORE_CASE)
+		private val APK_FILE_REGEX = Regex("((?:jellyfin|superjelly)-androidtv-v([0-9]+\\.[0-9]+\\.[0-9]+)(?:-[a-z0-9]+)?\\.apk)", RegexOption.IGNORE_CASE)
 		private var checkedThisProcess = false
 	}
 }

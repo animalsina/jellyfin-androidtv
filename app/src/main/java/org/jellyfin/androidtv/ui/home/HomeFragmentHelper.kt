@@ -7,6 +7,7 @@ import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.auth.repository.UserRepository
 import org.jellyfin.androidtv.constant.ChangeTriggerType
 import org.jellyfin.androidtv.data.repository.ExternalCatalogRepository
+import org.jellyfin.androidtv.data.repository.ExternalCatalogRepository.RaiPlayKind
 import org.jellyfin.androidtv.data.repository.ItemRepository
 import org.jellyfin.androidtv.ui.browsing.BrowseRowDef
 import org.jellyfin.sdk.api.client.ApiClient
@@ -19,6 +20,9 @@ import org.jellyfin.sdk.model.api.request.GetRecommendedProgramsRequest
 import org.jellyfin.sdk.model.api.request.GetRecordingsRequest
 import org.jellyfin.sdk.model.api.request.GetResumeItemsRequest
 import org.jellyfin.sdk.model.api.request.GetItemsRequest
+import org.jellyfin.sdk.model.api.ItemFields
+import org.jellyfin.sdk.model.api.ItemSortBy
+import org.jellyfin.sdk.model.api.SortOrder
 
 class HomeFragmentHelper(
 	private val context: Context,
@@ -135,6 +139,68 @@ class HomeFragmentHelper(
 			HomeFragmentSimilarToWatchedRow.create(context, userViews)
 		}
 
+	fun loadRandomMovies(userViews: Collection<BaseItemDto>): HomeFragmentRow = randomRow(
+		title = context.getString(R.string.home_section_random_movies),
+		userViews = userViews,
+		includeTypes = listOf(BaseItemKind.MOVIE),
+	)
+
+	fun loadRandomSeries(userViews: Collection<BaseItemDto>): HomeFragmentRow = randomRow(
+		title = context.getString(R.string.home_section_random_series),
+		userViews = userViews,
+		includeTypes = listOf(BaseItemKind.SERIES),
+	)
+
+	fun loadUnwatchedRandomMovies(userViews: Collection<BaseItemDto>): HomeFragmentRow = randomRow(
+		title = context.getString(R.string.home_section_unwatched_random_movies),
+		userViews = userViews,
+		includeTypes = listOf(BaseItemKind.MOVIE),
+		isPlayed = false,
+	)
+
+	fun loadLongAgoMovies(userViews: Collection<BaseItemDto>): HomeFragmentRow = randomRow(
+		title = context.getString(R.string.home_section_long_ago_movies),
+		userViews = userViews,
+		includeTypes = listOf(BaseItemKind.MOVIE),
+		sortBy = listOf(ItemSortBy.DATE_PLAYED),
+		sortOrder = listOf(SortOrder.ASCENDING),
+		isPlayed = true,
+	)
+
+	private fun randomRow(
+		title: String,
+		userViews: Collection<BaseItemDto>,
+		includeTypes: List<BaseItemKind>,
+		sortBy: List<ItemSortBy> = listOf(ItemSortBy.RANDOM),
+		sortOrder: List<SortOrder> = listOf(SortOrder.DESCENDING),
+		isPlayed: Boolean? = null,
+	): HomeFragmentRow {
+		val parentId = userViews
+			.filter { view ->
+				view.collectionType in when {
+					includeTypes.contains(BaseItemKind.MOVIE) && !includeTypes.contains(BaseItemKind.SERIES) -> listOf(org.jellyfin.sdk.model.api.CollectionType.MOVIES)
+					includeTypes.contains(BaseItemKind.SERIES) && !includeTypes.contains(BaseItemKind.MOVIE) -> listOf(org.jellyfin.sdk.model.api.CollectionType.TVSHOWS)
+					else -> listOf(org.jellyfin.sdk.model.api.CollectionType.MOVIES, org.jellyfin.sdk.model.api.CollectionType.TVSHOWS)
+				}
+			}
+			.takeIf { it.size == 1 }
+			?.firstOrNull()
+			?.id
+
+		val query = GetItemsRequest(
+			fields = ItemRepository.itemFields + ItemFields.DATE_CREATED,
+			includeItemTypes = includeTypes,
+			recursive = true,
+			sortBy = sortBy,
+			sortOrder = sortOrder,
+			limit = ITEM_LIMIT_RANDOM,
+			parentId = parentId,
+			isPlayed = isPlayed,
+		)
+
+		return HomeFragmentBrowseRowDefRow(BrowseRowDef(title, query, 50, false, true))
+	}
+
 	suspend fun loadGenreRandomMovies(userViews: Collection<BaseItemDto>): HomeFragmentRow =
 		withContext(Dispatchers.IO) {
 			HomeFragmentGenreRow.createMovieGenreRow(userViews)
@@ -166,7 +232,37 @@ class HomeFragmentHelper(
 		}
 
 	suspend fun loadExternalProviders(): HomeFragmentRow = withContext(Dispatchers.IO) {
-		HomeFragmentExternalProvidersRow(externalCatalogRepository.loadHomeCatalog())
+		HomeFragmentExternalProvidersRow(
+			items = externalCatalogRepository.loadHomeCatalog(limit = 180),
+			splitByCategory = true,
+		)
+	}
+
+	suspend fun loadPlutoCategory(title: String, groupMatchers: List<String>): HomeFragmentRow = withContext(Dispatchers.IO) {
+		HomeFragmentExternalProvidersRow(
+			items = externalCatalogRepository.loadCatalogByGroup(
+				providerIdPrefix = "pluto-tv",
+				groupMatchers = groupMatchers,
+				limit = 48,
+			),
+			title = title,
+		)
+	}
+
+	suspend fun loadRaiPlayFilm(title: String): HomeFragmentRow = withContext(Dispatchers.IO) {
+		HomeFragmentExternalProvidersRow(
+			items = externalCatalogRepository.loadRaiPlayCatalog(RaiPlayKind.FILM, limit = 60),
+			title = title,
+			splitByCategory = true,
+		)
+	}
+
+	suspend fun loadRaiPlaySeries(title: String): HomeFragmentRow = withContext(Dispatchers.IO) {
+		HomeFragmentExternalProvidersRow(
+			items = externalCatalogRepository.loadRaiPlayCatalog(RaiPlayKind.SERIES, limit = 60),
+			title = title,
+			splitByCategory = true,
+		)
 	}
 
 	suspend fun loadOnlineNewReleases(): HomeFragmentRow = withContext(Dispatchers.IO) {
@@ -203,6 +299,7 @@ class HomeFragmentHelper(
 		private const val ITEM_LIMIT_RECORDINGS = 15
 		private const val ITEM_LIMIT_NEXT_UP = 15
 		private const val ITEM_LIMIT_ON_NOW = 15
+		private const val ITEM_LIMIT_RANDOM = 20
 		private const val ITEM_LIMIT_LOCAL_MATCHES = 1200
 	}
 }

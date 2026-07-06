@@ -31,6 +31,24 @@ fun SettingsCustomizationScreen() {
 			)
 		}
 
+		item { ListSection(headingContent = { Text(stringResource(R.string.pref_browsing)) }) }
+
+		item {
+			ListButton(
+				leadingContent = { Icon(painterResource(R.drawable.ic_house), contentDescription = null) },
+				headingContent = { Text(stringResource(R.string.home_prefs)) },
+				onClick = { router.push(Routes.HOME) }
+			)
+		}
+
+		item {
+			ListButton(
+				leadingContent = { Icon(painterResource(R.drawable.ic_grid), contentDescription = null) },
+				headingContent = { Text(stringResource(R.string.pref_libraries)) },
+				onClick = { router.push(Routes.LIBRARIES) }
+			)
+		}
+
 		item {
 			var appTheme by rememberPreference(userPreferences, UserPreferences.appTheme)
 
@@ -82,22 +100,5 @@ fun SettingsCustomizationScreen() {
 			)
 		}
 
-		item { ListSection(headingContent = { Text(stringResource(R.string.pref_browsing)) }) }
-
-		item {
-			ListButton(
-				leadingContent = { Icon(painterResource(R.drawable.ic_grid), contentDescription = null) },
-				headingContent = { Text(stringResource(R.string.pref_libraries)) },
-				onClick = { router.push(Routes.LIBRARIES) }
-			)
-		}
-
-		item {
-			ListButton(
-				leadingContent = { Icon(painterResource(R.drawable.ic_house), contentDescription = null) },
-				headingContent = { Text(stringResource(R.string.home_prefs)) },
-				onClick = { router.push(Routes.HOME) }
-			)
-		}
 	}
 }

@@ -1,10 +1,15 @@
 package org.jellyfin.androidtv.ui.settings.screen.about
 
 import android.content.ClipData
+import android.content.Context
+import android.content.ContextWrapper
 import android.os.Build
+import android.widget.Toast
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.fragment.app.FragmentActivity
 import org.jellyfin.androidtv.BuildConfig
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.ui.base.Icon
@@ -15,10 +20,12 @@ import org.jellyfin.androidtv.ui.navigation.LocalRouter
 import org.jellyfin.androidtv.ui.settings.Routes
 import org.jellyfin.androidtv.ui.settings.composable.SettingsColumn
 import org.jellyfin.androidtv.ui.settings.util.copyAction
+import org.jellyfin.androidtv.update.ApkUpdateManager
 
 @Composable
 fun SettingsAboutScreen(launchedFromLogin: Boolean = false) {
 	val router = LocalRouter.current
+	val context = LocalContext.current
 
 	SettingsColumn {
 		if (launchedFromLogin) item {
@@ -34,13 +41,26 @@ fun SettingsAboutScreen(launchedFromLogin: Boolean = false) {
 		}
 
 		item {
-			val heading = "Jellyfin app version"
-			val caption = "jellyfin-androidtv ${BuildConfig.VERSION_NAME} ${BuildConfig.BUILD_TYPE}"
+			val heading = "SuperJelly app version"
+			val caption = "superjelly-androidtv ${BuildConfig.VERSION_NAME} ${BuildConfig.BUILD_TYPE}"
 			ListButton(
 				leadingContent = { Icon(painterResource(R.drawable.ic_jellyfin), contentDescription = null) },
 				headingContent = { Text(heading) },
 				captionContent = { Text(caption) },
 				onClick = copyAction(ClipData.newPlainText(heading, caption)),
+			)
+		}
+
+		item {
+			ListButton(
+				leadingContent = { Icon(painterResource(R.drawable.ic_update), contentDescription = null) },
+				headingContent = { Text(stringResource(R.string.pref_check_apk_updates)) },
+				captionContent = { Text(stringResource(R.string.pref_check_apk_updates_description)) },
+				onClick = {
+					val activity = context.findFragmentActivity()
+					if (activity != null) ApkUpdateManager(activity).checkForUpdates(force = true)
+					else Toast.makeText(context, R.string.apk_update_check_failed_title, Toast.LENGTH_SHORT).show()
+				},
 			)
 		}
 
@@ -71,4 +91,9 @@ fun SettingsAboutScreen(launchedFromLogin: Boolean = false) {
 			)
 		}
 	}
+}
+private tailrec fun Context.findFragmentActivity(): FragmentActivity? = when (this) {
+	is FragmentActivity -> this
+	is ContextWrapper -> baseContext.findFragmentActivity()
+	else -> null
 }

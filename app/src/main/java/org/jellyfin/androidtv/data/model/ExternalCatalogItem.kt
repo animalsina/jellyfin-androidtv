@@ -13,6 +13,7 @@ data class ExternalCatalogItem(
 	val detailUrl: String? = null,
 	val posterUrl: String? = null,
 	val backdropUrl: String? = null,
+	val providerLogoUrl: String? = null,
 	val group: String? = null,
 	val isFree: Boolean = true,
 	val releaseDate: String? = null,

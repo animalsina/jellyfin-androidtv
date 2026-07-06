@@ -26,13 +26,16 @@ import androidx.work.await
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.flow.first
 import org.jellyfin.androidtv.R
+import org.jellyfin.androidtv.constant.HomeSectionType
 import org.jellyfin.androidtv.data.model.ExternalCatalogItem
 import org.jellyfin.androidtv.data.repository.ExternalCatalogRepository
 import org.jellyfin.androidtv.data.repository.ItemRepository
 import org.jellyfin.androidtv.data.repository.UserViewsRepository
 import org.jellyfin.androidtv.integration.provider.ImageProvider
 import org.jellyfin.androidtv.preference.UserPreferences
+import org.jellyfin.androidtv.preference.UserSettingPreferences
 import org.jellyfin.androidtv.ui.startup.StartupActivity
 import org.jellyfin.androidtv.util.AndroidVersion
 import org.jellyfin.androidtv.util.ImageHelper
@@ -46,13 +49,20 @@ import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.exception.ApiClientException
 import org.jellyfin.sdk.api.client.exception.TimeoutException
 import org.jellyfin.sdk.api.client.extensions.itemsApi
+import org.jellyfin.sdk.api.client.extensions.liveTvApi
 import org.jellyfin.sdk.api.client.extensions.tvShowsApi
 import org.jellyfin.sdk.api.client.extensions.userLibraryApi
 import org.jellyfin.sdk.api.client.extensions.userViewsApi
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.ImageType
+import org.jellyfin.sdk.model.api.ItemFields
+import org.jellyfin.sdk.model.api.ItemSortBy
 import org.jellyfin.sdk.model.api.MediaType
+import org.jellyfin.sdk.model.api.SortOrder
+import org.jellyfin.sdk.model.api.request.GetItemsRequest
+import org.jellyfin.sdk.model.api.request.GetRecordingsRequest
+import org.jellyfin.sdk.model.api.request.GetResumeItemsRequest
 import org.jellyfin.sdk.model.extensions.ticks
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
@@ -74,6 +84,28 @@ class LeanbackChannelWorker(
 ) : CoroutineWorker(context, workerParams), KoinComponent {
 	companion object {
 		private const val PERIODIC_UPDATE_REQUEST_NAME = "LeanbackChannelPeriodicUpdateRequest"
+		private const val PROJECTIVY_CHANNEL_ITEM_LIMIT = 20
+		private const val PROJECTIVY_EXTERNAL_CHANNEL_LIMIT = 32
+		private val PROJECTIVY_GENRES = listOf(
+			"action" to R.string.lbl_action,
+			"adventure" to R.string.lbl_adventure,
+			"animation" to R.string.lbl_animation,
+			"comedy" to R.string.lbl_comedy,
+			"crime" to R.string.lbl_crime,
+			"documentary" to R.string.lbl_documentary,
+			"drama" to R.string.lbl_drama,
+			"family" to R.string.lbl_family,
+			"fantasy" to R.string.lbl_fantasy,
+			"history" to R.string.lbl_history,
+			"horror" to R.string.lbl_horror,
+			"music" to R.string.lbl_music,
+			"mystery" to R.string.lbl_mystery,
+			"romance" to R.string.lbl_romance,
+			"science_fiction" to R.string.lbl_science_fiction,
+			"thriller" to R.string.lbl_thriller,
+			"war" to R.string.lbl_war,
+			"western" to R.string.lbl_western,
+		)
 
 		suspend fun enqueue(workManager: WorkManager) {
 			workManager.enqueueUniquePeriodicWork(
@@ -88,9 +120,22 @@ class LeanbackChannelWorker(
 
 	private val api by inject<ApiClient>()
 	private val userPreferences by inject<UserPreferences>()
+	private val userSettingPreferences by inject<UserSettingPreferences>()
 	private val userViewsRepository by inject<UserViewsRepository>()
 	private val imageHelper by inject<ImageHelper>()
 	private val externalCatalogRepository by inject<ExternalCatalogRepository>()
+
+	private data class HomeSectionChannel(
+		val key: String,
+		val title: String,
+		val items: List<BaseItemDto>,
+	)
+
+	private data class ExternalCatalogChannel(
+		val key: String,
+		val title: String,
+		val items: List<ExternalCatalogItem>,
+	)
 
 	/**
 	 * Check if the app can use Leanback features and is API level 26 or higher.
@@ -116,7 +161,9 @@ class LeanbackChannelWorker(
 			val (latestEpisodes, latestMovies, latestMedia) = getLatestMedia()
 			val myMedia = getMyMedia()
 			val externalCatalogItems = getExternalCatalogItems()
+			val externalCatalogChannels = getExternalCatalogChannels(externalCatalogItems)
 			val onlineNewReleaseItems = getOnlineNewReleaseItems()
+			val homeSectionChannels = getHomeSectionChannels()
 			// Delete current items from the channels
 			context.contentResolver.delete(TvContractCompat.PreviewPrograms.CONTENT_URI, null, null)
 
@@ -198,7 +245,34 @@ class LeanbackChannelWorker(
 					}
 				}
 			}
+			homeSectionChannels.forEach { channelData ->
+				val channel = getChannelUri(
+					"home_${channelData.key}",
+					Channel.Builder()
+						.setType(TvContractCompat.Channels.TYPE_PREVIEW)
+						.setDisplayName(channelData.title)
+						.setAppLinkIntent(Intent(context, StartupActivity::class.java))
+						.build()
+				)
+				if (channel != null) {
+					context.contentResolver.bulkInsert(
+						TvContractCompat.PreviewPrograms.CONTENT_URI,
+						channelData.items.map { item -> createPreviewProgram(channel, item, preferParentThumb) }.toTypedArray()
+					)
+				}
+			}
 			insertExternalPrograms(externalCatalogChannel, externalCatalogItems)
+			externalCatalogChannels.forEach { channelData ->
+				val channel = getChannelUri(
+					"external_${channelData.key}",
+					Channel.Builder()
+						.setType(TvContractCompat.Channels.TYPE_PREVIEW)
+						.setDisplayName(channelData.title)
+						.setAppLinkIntent(Intent(context, StartupActivity::class.java))
+						.build()
+				)
+				insertExternalPrograms(channel, channelData.items)
+			}
 			insertExternalPrograms(onlineNewReleasesChannel, onlineNewReleaseItems)
 			updateWatchNext(resumeItems + nextUpItems)
 
@@ -277,14 +351,200 @@ class LeanbackChannelWorker(
 			.filter { userViewsRepository.isSupported(it.collectionType) }
 	}
 
+	private suspend fun getHomeSectionChannels(): List<HomeSectionChannel> = withContext(Dispatchers.IO) {
+		runCatching { if (userSettingPreferences.shouldUpdate) userSettingPreferences.update() }
+		val userViews = runCatching { userViewsRepository.views.first() }.getOrDefault(emptyList())
+		val configuredSections = userSettingPreferences.activeHomesections
+		val allProgramSections = HomeSectionType.entries
+			.filterNot { it == HomeSectionType.NONE || it == HomeSectionType.ONLINE_NEW_RELEASES || it.isExternalCatalogSection() }
+			.filterNot { it == HomeSectionType.RESUME_BOOK || it == HomeSectionType.LIVE_TV }
+		val sectionChannels = (configuredSections + allProgramSections)
+			.distinct()
+			.mapNotNull { section ->
+				val items = runCatching { loadItemsForHomeSection(section, userViews) }
+					.onFailure { Timber.w(it, "Unable to populate Android TV channel for $section") }
+					.getOrDefault(emptyList())
+				if (items.isEmpty()) null
+				else HomeSectionChannel(section.serializedName, context.getString(section.nameRes), items.take(PROJECTIVY_CHANNEL_ITEM_LIMIT))
+			}
+
+		sectionChannels + getGenreProjectivyChannels(userViews)
+	}
+
+	private suspend fun loadItemsForHomeSection(section: HomeSectionType, userViews: Collection<BaseItemDto>): List<BaseItemDto> = when (section) {
+		HomeSectionType.LATEST_MEDIA -> api.userLibraryApi.getLatestMedia(
+			fields = ItemRepository.itemFields,
+			limit = PROJECTIVY_CHANNEL_ITEM_LIMIT,
+			includeItemTypes = listOf(BaseItemKind.MOVIE, BaseItemKind.SERIES, BaseItemKind.EPISODE),
+			isPlayed = false,
+		).content
+		HomeSectionType.LIBRARY_TILES_SMALL,
+		HomeSectionType.LIBRARY_BUTTONS -> getMyMedia()
+		HomeSectionType.RESUME -> api.itemsApi.getResumeItems(
+			GetResumeItemsRequest(
+				limit = PROJECTIVY_CHANNEL_ITEM_LIMIT,
+				fields = ItemRepository.itemFields,
+				imageTypeLimit = 1,
+				enableTotalRecordCount = false,
+				mediaTypes = listOf(MediaType.VIDEO),
+			)
+		).content.items
+		HomeSectionType.RESUME_AUDIO -> api.itemsApi.getResumeItems(
+			GetResumeItemsRequest(
+				limit = PROJECTIVY_CHANNEL_ITEM_LIMIT,
+				fields = ItemRepository.itemFields,
+				imageTypeLimit = 1,
+				enableTotalRecordCount = false,
+				mediaTypes = listOf(MediaType.AUDIO),
+			)
+		).content.items
+		HomeSectionType.ACTIVE_RECORDINGS -> api.liveTvApi.getRecordings(
+			GetRecordingsRequest(
+				fields = ItemRepository.itemFields,
+				enableImages = true,
+				limit = PROJECTIVY_CHANNEL_ITEM_LIMIT,
+			)
+		).content.items
+		HomeSectionType.NEXT_UP -> api.tvShowsApi.getNextUp(
+			imageTypeLimit = 1,
+			limit = PROJECTIVY_CHANNEL_ITEM_LIMIT,
+			enableResumable = false,
+			fields = ItemRepository.browseFields,
+		).content.items
+		HomeSectionType.RECOMMENDED_FOR_YOU -> queryMovieSeries(userViews, listOf(ItemSortBy.RANDOM), minCommunityRating = 6.5, isPlayed = false)
+		HomeSectionType.TRENDING_THIS_WEEK -> queryMovieSeries(userViews, listOf(ItemSortBy.DATE_PLAYED))
+		HomeSectionType.RECENTLY_RELEASED -> queryMovieSeries(userViews, listOf(ItemSortBy.PREMIERE_DATE))
+		HomeSectionType.POPULAR_MOVIES -> queryMovieSeries(userViews, listOf(ItemSortBy.PLAY_COUNT), includeTypes = listOf(BaseItemKind.MOVIE))
+		HomeSectionType.POPULAR_TV -> queryMovieSeries(userViews, listOf(ItemSortBy.PLAY_COUNT), includeTypes = listOf(BaseItemKind.SERIES))
+		HomeSectionType.RANDOM_MOVIES -> queryMovieSeries(userViews, listOf(ItemSortBy.RANDOM), includeTypes = listOf(BaseItemKind.MOVIE))
+		HomeSectionType.RANDOM_SERIES -> queryMovieSeries(userViews, listOf(ItemSortBy.RANDOM), includeTypes = listOf(BaseItemKind.SERIES))
+		HomeSectionType.UNWATCHED_RANDOM_MOVIES -> queryMovieSeries(userViews, listOf(ItemSortBy.RANDOM), includeTypes = listOf(BaseItemKind.MOVIE), isPlayed = false)
+		HomeSectionType.LONG_AGO_MOVIES -> queryMovieSeries(
+			userViews,
+			listOf(ItemSortBy.DATE_PLAYED),
+			includeTypes = listOf(BaseItemKind.MOVIE),
+			sortOrder = listOf(SortOrder.ASCENDING),
+			isPlayed = true,
+		)
+		HomeSectionType.SIMILAR_TO_WATCHED,
+		HomeSectionType.GENRE_RANDOM_MOVIES,
+		HomeSectionType.GENRE_RANDOM_TV,
+		HomeSectionType.GENRE_RANDOM_MIXED,
+		HomeSectionType.MOOD_LIGHT,
+		HomeSectionType.MOOD_ACTION,
+		HomeSectionType.MOOD_SHORT -> queryMovieSeries(userViews, listOf(ItemSortBy.RANDOM), isPlayed = false)
+		HomeSectionType.LIVE_TV,
+		HomeSectionType.RESUME_BOOK,
+		HomeSectionType.EXTERNAL_PROVIDERS,
+		HomeSectionType.PLUTO_ACTION,
+		HomeSectionType.PLUTO_COMEDY,
+		HomeSectionType.PLUTO_DRAMA,
+		HomeSectionType.PLUTO_THRILLER,
+		HomeSectionType.PLUTO_DOCUMENTARY,
+		HomeSectionType.PLUTO_SCIFI,
+		HomeSectionType.RAIPLAY_FILM,
+		HomeSectionType.RAIPLAY_SERIES,
+		HomeSectionType.ONLINE_NEW_RELEASES,
+		HomeSectionType.NONE -> emptyList()
+		else -> emptyList()
+	}
+
+	private suspend fun queryMovieSeries(
+		userViews: Collection<BaseItemDto>,
+		sortBy: List<ItemSortBy>,
+		includeTypes: List<BaseItemKind> = listOf(BaseItemKind.MOVIE, BaseItemKind.SERIES),
+		minCommunityRating: Double? = null,
+		isPlayed: Boolean? = null,
+		sortOrder: List<SortOrder> = listOf(SortOrder.DESCENDING),
+		genres: List<String>? = null,
+	): List<BaseItemDto> {
+		val parentId = userViews
+			.filter { it.collectionType == org.jellyfin.sdk.model.api.CollectionType.MOVIES || it.collectionType == org.jellyfin.sdk.model.api.CollectionType.TVSHOWS }
+			.takeIf { it.size == 1 }
+			?.firstOrNull()
+			?.id
+		return api.itemsApi.getItems(
+			GetItemsRequest(
+				fields = ItemRepository.itemFields + ItemFields.DATE_CREATED,
+				includeItemTypes = includeTypes,
+				recursive = true,
+				sortBy = sortBy,
+				sortOrder = sortOrder,
+				limit = PROJECTIVY_CHANNEL_ITEM_LIMIT,
+				parentId = parentId,
+				minCommunityRating = minCommunityRating,
+				isPlayed = isPlayed,
+				genres = genres,
+			)
+		).content.items.orEmpty()
+	}
+
+	private suspend fun getGenreProjectivyChannels(userViews: Collection<BaseItemDto>): List<HomeSectionChannel> {
+		return PROJECTIVY_GENRES.mapNotNull { (key, titleRes) ->
+			val title = context.getString(titleRes)
+			val items = runCatching {
+				queryMovieSeries(
+					userViews = userViews,
+					sortBy = listOf(ItemSortBy.RANDOM),
+					genres = listOf(title),
+				)
+			}
+				.onFailure { Timber.w(it, "Unable to populate Projectivy genre channel $title") }
+				.getOrDefault(emptyList())
+			if (items.isEmpty()) null
+			else HomeSectionChannel("genre_$key", title, items.take(PROJECTIVY_CHANNEL_ITEM_LIMIT))
+		}
+	}
+
+	private fun HomeSectionType.isExternalCatalogSection(): Boolean = when (this) {
+		HomeSectionType.EXTERNAL_PROVIDERS,
+		HomeSectionType.PLUTO_ACTION,
+		HomeSectionType.PLUTO_COMEDY,
+		HomeSectionType.PLUTO_DRAMA,
+		HomeSectionType.PLUTO_THRILLER,
+		HomeSectionType.PLUTO_DOCUMENTARY,
+		HomeSectionType.PLUTO_SCIFI,
+		HomeSectionType.RAIPLAY_FILM,
+		HomeSectionType.RAIPLAY_SERIES -> true
+		else -> false
+	}
+
+	private fun getExternalCatalogChannels(items: List<ExternalCatalogItem>): List<ExternalCatalogChannel> {
+		return items
+			.groupBy { item -> externalChannelTitle(item) }
+			.toList()
+			.sortedByDescending { (_, groupItems) -> groupItems.size }
+			.take(PROJECTIVY_EXTERNAL_CHANNEL_LIMIT)
+			.mapNotNull { (title, groupItems) ->
+				val limited = groupItems.take(PROJECTIVY_CHANNEL_ITEM_LIMIT)
+				if (limited.isEmpty()) null else ExternalCatalogChannel(sanitizeChannelKey(title), title, limited)
+			}
+	}
+
+	private fun externalChannelTitle(item: ExternalCatalogItem): String {
+		val provider = when {
+			item.providerId.startsWith("pluto", ignoreCase = true) -> "Pluto TV"
+			item.providerId.startsWith("raiplay", ignoreCase = true) -> "RaiPlay"
+			else -> item.providerName
+		}
+		val group = item.group?.takeIf { it.isNotBlank() }
+		return if (group.isNullOrBlank() || group.equals(provider, ignoreCase = true)) provider else "$provider · $group"
+	}
+
+	private fun sanitizeChannelKey(value: String): String = value
+		.lowercase()
+		.replace(Regex("[^a-z0-9]+"), "_")
+		.trim('_')
+		.take(48)
+
 	private suspend fun getExternalCatalogItems(): List<ExternalCatalogItem> = withContext(Dispatchers.IO) {
-		runCatching { externalCatalogRepository.loadHomeCatalog(limit = 20) }
+		runCatching { externalCatalogRepository.loadHomeCatalog(limit = 240) }
 			.onFailure { Timber.w(it, "Unable to populate external catalog Android TV channel") }
 			.getOrDefault(emptyList())
 	}
 
 	private suspend fun getOnlineNewReleaseItems(): List<ExternalCatalogItem> = withContext(Dispatchers.IO) {
-		runCatching { externalCatalogRepository.loadNewReleases(limit = 20) }
+		runCatching { externalCatalogRepository.loadNewReleases(limit = 60) }
 			.onFailure { Timber.w(it, "Unable to populate online new releases Android TV channel") }
 			.getOrDefault(emptyList())
 	}

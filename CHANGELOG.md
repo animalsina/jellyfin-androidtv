@@ -1,5 +1,64 @@
 # Changelog
 
+## v1.0.27 - 2026-07-06
+
+- Rimosso il nuovo hero carousel separato introdotto nella versione precedente: la home torna al comportamento precedente, dove il blocco grande in alto segue il focus delle card nelle righe.
+- Rimossa l'impostazione del hero carousel dedicato, così la configurazione home torna a mostrare solo le righe.
+- Projectivy/Android TV launcher pubblica tutte le righe filtrate disponibili nel programma, non solo quelle già selezionate nella home.
+- Aggiunte nuove righe configurabili, non attive di default, e pubblicabili su Projectivy: film casuali, serie casuali, film mai visti a caso e film che non vedi da tanto.
+- Projectivy crea anche canali per i principali generi disponibili, così puoi avere righe dedicate per azione, commedia, drama, horror, fantascienza, thriller e altri generi.
+
+## v1.0.26 - 2026-07-06
+
+- Il blocco superiore della home diventa un vero hero carousel fisso e indipendente dalle righe: pesca contenuti casuali, ruota automaticamente e mantiene azioni Riproduci/Dettagli.
+- I trailer nel hero vengono caricati in anticipo e appaiono in fade solo dopo 4 secondi di permanenza sul contenuto e almeno 3 secondi di preload.
+- Le righe della home non pilotano più il carousel quando il carousel hero è attivo, così le righe restano semplici elenchi navigabili.
+- Aggiunte impostazioni dedicate per abilitare/disabilitare il hero carousel.
+- Aggiunti nuovi filtri/sezioni home per Pluto TV per genere e RaiPlay Film/Serie.
+- Il catalogo esterno ora divide Pluto TV e RaiPlay in più righe per categoria quando disponibili.
+- Le copertine dei contenuti esterni vengono prese dal feed quando presenti e, per Pluto, arricchite tramite metadati pubblici per ridurre i placeholder generici.
+- Projectivy/Android TV riceve anche canali filtrati per categoria/provider, così può mostrare molte più righe disponibili.
+
+## v1.0.25 - 2026-07-06
+
+- La home evita il rebuild completo quando torni indietro: mantiene righe e copertine già caricate, aggiorna solo dopo scan libreria o dopo una finestra di refresh morbido.
+- Il primo frame della home è più leggero: carica subito solo le prime righe utili, rimanda le altre, rimuove il probe Live TV bloccante e aumenta la cache delle card.
+- Le copertine in home non decodificano più BlurHash per ogni card e rispettano davvero il crossfade disattivato, riducendo flicker e micro-lag durante lo scroll.
+- Il tasto Back fisico torna alla schermata precedente prima di proporre l’uscita dall’app, così entrando in una scheda dalla home puoi rientrare correttamente alla home.
+- Il blocco superiore diventa un carousel hero in stile streaming: ruota automaticamente sui contenuti più interessanti, si ferma quando navighi manualmente e mostra azioni rapide Riproduci/Dettagli.
+- I trailer YouTube non caricano più la pagina `watch`, che su alcune WebView TV mostra il falso messaggio Android 4: ora usano un documento iframe interno anche nel player fullscreen.
+
+## v1.0.24 - 2026-07-06
+
+- Corretto il blocco compilazione Kotlin nella home: il listener `setOnKeyInterceptListener` ora riceve una vera istanza `BaseGridView.OnKeyInterceptListener`, non il fragment.
+- Il guard del tasto Su resta attivo prima che Leanback sposti il focus al menu alto, ma senza rompere la compilazione.
+
+## v1.0.23 - 2026-07-06
+
+- Il pulsante trailer resta dentro SuperJelly: YouTube non viene più aperto subito in SmartTube/YouTube, ma viene caricato nel layer WebView dedicato con supporto fullscreen interno.
+- Nella home il tasto Su viene intercettato prima del focus Leanback: dalle righe inferiori risale riga per riga e può andare al menu alto solo quando il focus è davvero sulla primissima riga.
+
+## v1.0.22 - 2026-07-06
+
+- Il logo/banner SuperJelly torna a mostrare chiaramente il testo “SUPER JELLY” nella card Android TV/launcher, senza tagli.
+- I trailer YouTube aprono prima SmartTube/YouTube quando disponibili e usano un embed con referrer quando devono ricadere nella WebView, evitando l’errore player 153 quando possibile.
+- Nella home il focus può uscire verso il menu alto solo dalla primissima riga: dalle righe inferiori il tasto Su riporta prima alle righe precedenti.
+- L’uscita dall’app richiede una seconda pressione Back entro 5 secondi e mostra una modale esplicativa prima di chiudere SuperJelly.
+- La pressione prolungata su una copertina in home apre un menu rapido con scheda, riproduzione, Dove guardarlo, ricerca server e altre azioni disponibili.
+- I contenuti Pluto non usano più il logo canale come copertina film: quando il feed non espone poster/backdrop, SuperJelly prova ad arricchire titolo, immagine e teaser tramite metadati pubblici.
+- Projectivy/Android TV riceve canali anche per le sezioni home configurate, non solo per le righe speciali SuperJelly.
+
+## v1.0.21 - 2026-07-06
+
+- Logo, banner e icone SuperJelly sono stati ripuliti: niente testo tagliato nella card TV e stile visivo più vicino alle forme XML originali Jellyfin.
+- Il controllo manuale aggiornamenti APK è tornato nella schermata Informazioni e resta compatibile con `superjelly-androidtv-vX.Y.Z-debug.apk`, varianti release e vecchi `jellyfin-androidtv-vX.Y.Z-debug.apk` nella cartella remota configurata.
+- Nella home, l'uscita verso il menu superiore richiede una doppia pressione su "Su" in breve tempo quando sei sulla prima riga, evitando salti accidentali al menu.
+- La home carica le prime righe insieme, mantiene più card in cache e alleggerisce blurhash/crossfade delle copertine per ridurre scatti e schermate temporaneamente rotte.
+- In Impostazioni > Personalizzazione, la sezione Navigazione è ora in cima e "Pagina iniziale" viene mostrata prima delle librerie.
+- Il player trailer interno usa WebView hardware-accelerata con embed YouTube diretto e fallback SmartTube/YouTube quando il layer non è supportato.
+- "Dove guardarlo" ora cerca anche corrispondenze nei cataloghi gratuiti caricati da SuperJelly e, quando trova un flusso libero, propone la riproduzione interna prima delle ricerche provider.
+- Le card dei cataloghi esterni usano un'immagine provider di fallback quando il feed non espone poster o backdrop, così non degradano subito all'icona generica film.
+
 ## v1.0.19 - 2026-07-06
 
 - I trailer in home partono in modo più affidabile dopo focus stabile: prima vengono usati i trailer già presenti nei metadati Jellyfin, poi una ricerca YouTube più tollerante e cancellabile al cambio elemento.
@@ -62,6 +121,14 @@
 - Mantenuto invariato il comportamento Android TV/D-pad.
 
 # Changelog
+
+## v1.0.27 - 2026-07-06
+
+- Rimosso il nuovo hero carousel separato introdotto nella versione precedente: la home torna al comportamento precedente, dove il blocco grande in alto segue il focus delle card nelle righe.
+- Rimossa l'impostazione del hero carousel dedicato, così la configurazione home torna a mostrare solo le righe.
+- Projectivy/Android TV launcher pubblica tutte le righe filtrate disponibili nel programma, non solo quelle già selezionate nella home.
+- Aggiunte nuove righe configurabili, non attive di default, e pubblicabili su Projectivy: film casuali, serie casuali, film mai visti a caso e film che non vedi da tanto.
+- Projectivy crea anche canali per i principali generi disponibili, così puoi avere righe dedicate per azione, commedia, drama, horror, fantascienza, thriller e altri generi.
 
 ## v1.0.19 - 2026-07-06
 

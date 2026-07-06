@@ -1,7 +1,12 @@
 package org.jellyfin.androidtv.ui.browsing
 
+import android.app.AlertDialog
+import android.content.DialogInterface
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.os.SystemClock
 import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
@@ -17,6 +22,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.auth.repository.SessionRepository
 import org.jellyfin.androidtv.auth.repository.UserRepository
 import org.jellyfin.androidtv.integration.LeanbackChannelWorker
@@ -36,6 +42,13 @@ import org.koin.androidx.viewmodel.ext.android.viewModel
 import timber.log.Timber
 
 class MainActivity : FragmentActivity() {
+	private val exitPromptHandler = Handler(Looper.getMainLooper())
+	private var exitPromptDialog: AlertDialog? = null
+	private var exitPromptUntil = 0L
+	private val dismissExitPromptRunnable = Runnable {
+		exitPromptDialog?.dismiss()
+		exitPromptUntil = 0L
+	}
 	private val navigationRepository by inject<NavigationRepository>()
 	private val sessionRepository by inject<SessionRepository>()
 	private val userRepository by inject<UserRepository>()
@@ -106,6 +119,50 @@ class MainActivity : FragmentActivity() {
 		super.onPause()
 
 		interactionTrackerViewModel.activityPaused = true
+		dismissExitPrompt()
+	}
+
+	private fun dismissExitPrompt() {
+		exitPromptHandler.removeCallbacks(dismissExitPromptRunnable)
+		exitPromptDialog?.dismiss()
+		exitPromptDialog = null
+		exitPromptUntil = 0L
+	}
+
+	private fun handleBackToExit(): Boolean {
+		if (navigationRepository.canGoBack) return false
+
+		val now = SystemClock.uptimeMillis()
+		if (now <= exitPromptUntil && exitPromptDialog?.isShowing == true) {
+			dismissExitPrompt()
+			finishAfterTransition()
+			return true
+		}
+
+		exitPromptUntil = now + EXIT_PROMPT_TIMEOUT_MS
+		exitPromptDialog?.dismiss()
+		exitPromptDialog = AlertDialog.Builder(this)
+			.setTitle(R.string.lbl_exit)
+			.setMessage(R.string.msg_press_back_twice_to_exit)
+			.setOnKeyListener { _: DialogInterface, keyCode: Int, event: KeyEvent ->
+				if (keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) {
+					dismissExitPrompt()
+					finishAfterTransition()
+					true
+				} else {
+					false
+				}
+			}
+			.setOnDismissListener {
+				exitPromptHandler.removeCallbacks(dismissExitPromptRunnable)
+				if (SystemClock.uptimeMillis() > exitPromptUntil) exitPromptUntil = 0L
+			}
+			.create()
+
+		exitPromptDialog?.show()
+		exitPromptHandler.removeCallbacks(dismissExitPromptRunnable)
+		exitPromptHandler.postDelayed(dismissExitPromptRunnable, EXIT_PROMPT_TIMEOUT_MS)
+		return true
 	}
 
 	override fun onStop() {
@@ -133,9 +190,35 @@ class MainActivity : FragmentActivity() {
 	override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean =
 		onKeyEvent(keyCode, event) || super.onKeyDown(keyCode, event)
 
-	override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean =
-		onKeyEvent(keyCode, event) || super.onKeyUp(keyCode, event)
+	override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+		if ((keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE) && event?.action == KeyEvent.ACTION_UP) {
+			if (navigationRepository.canGoBack) {
+				dismissExitPrompt()
+				navigationRepository.goBack()
+				return true
+			}
+
+			if (handleBackToExit()) return true
+		}
+
+		return onKeyEvent(keyCode, event) || super.onKeyUp(keyCode, event)
+	}
+
+	@Deprecated("Deprecated in AndroidX Activity, still used as a safety net for TV remotes")
+	override fun onBackPressed() {
+		if (navigationRepository.canGoBack) {
+			dismissExitPrompt()
+			navigationRepository.goBack()
+			return
+		}
+
+		if (!handleBackToExit()) super.onBackPressed()
+	}
 
 	override fun onKeyLongPress(keyCode: Int, event: KeyEvent?): Boolean =
-		onKeyEvent(keyCode, event) || super.onKeyUp(keyCode, event)
+		onKeyEvent(keyCode, event) || super.onKeyLongPress(keyCode, event)
+
+	companion object {
+		private const val EXIT_PROMPT_TIMEOUT_MS = 5_000L
+	}
 }

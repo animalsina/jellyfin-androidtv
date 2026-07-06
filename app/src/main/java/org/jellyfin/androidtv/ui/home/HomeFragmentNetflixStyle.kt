@@ -2,13 +2,18 @@ package org.jellyfin.androidtv.ui.home
 
 import android.content.Intent
 import android.os.Bundle
+import android.os.SystemClock
 import android.util.LruCache
+import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.Button
 import android.widget.FrameLayout
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.core.content.res.ResourcesCompat
@@ -39,6 +44,7 @@ import org.jellyfin.androidtv.auth.repository.UserRepository
 import org.jellyfin.androidtv.data.repository.NotificationsRepository
 import org.jellyfin.androidtv.data.repository.UserViewsRepository
 import org.jellyfin.androidtv.preference.UserPreferences
+import org.jellyfin.androidtv.streaming.ExternalCatalogLauncher
 import org.jellyfin.androidtv.ui.AsyncImageView
 import org.jellyfin.androidtv.ui.itemhandling.BaseRowItem
 import org.jellyfin.androidtv.ui.itemhandling.ExternalCatalogBaseRowItem
@@ -50,6 +56,7 @@ import org.jellyfin.androidtv.ui.playback.MediaManager
 import org.jellyfin.androidtv.ui.settings.compat.SettingsViewModel
 import org.jellyfin.androidtv.ui.startup.StartupActivity
 import org.jellyfin.androidtv.util.ImageHelper
+import org.jellyfin.androidtv.util.KeyProcessor
 import org.jellyfin.androidtv.util.apiclient.getUrl
 import org.jellyfin.androidtv.util.apiclient.itemBackdropImages
 import org.jellyfin.androidtv.util.apiclient.itemImages
@@ -79,7 +86,9 @@ class HomeFragmentNetflixStyle : Fragment() {
 	private val mediaManager by inject<MediaManager>()
 	private val imageHelper by inject<ImageHelper>()
 	private val userViewsRepository by inject<UserViewsRepository>()
+	private val userPreferences by inject<UserPreferences>()
 	private val itemLauncher by inject<ItemLauncher>()
+	private val keyProcessor by inject<KeyProcessor>()
 	private val homePreviewViewModel: HomePreviewViewModel by activityViewModel()
 	private val settingsViewModel: SettingsViewModel by activityViewModel()
 
@@ -95,6 +104,9 @@ class HomeFragmentNetflixStyle : Fragment() {
 	private lateinit var previewPoster: AsyncImageView
 	private lateinit var contentView: FragmentContainerView
 	private lateinit var previewSubtitle: TextView
+	private lateinit var previewActions: LinearLayout
+	private lateinit var previewPlayButton: Button
+	private lateinit var previewMoreInfoButton: Button
 
 	// Trailer
 	private lateinit var trailerContainer: FrameLayout
@@ -113,16 +125,20 @@ class HomeFragmentNetflixStyle : Fragment() {
 	private var previewBackdropJob: Job? = null
 	private var trailerSearchCall: Call? = null
 	private var trailerCheckCall: Call? = null
+	private var currentPreviewItem: BaseRowItem? = null
 	private var currentPreviewItemId: String? = null
 	private var currentBackdropUrl: String? = null
 	private var currentTrailerVideoId: String? = null
+	private var currentPreviewStartedAt = 0L
 	private var trailerFailures = 0
 	private var trailersDisabledUntil = 0L
 
 	companion object {
 		private val TRAILER_TYPES =
 			setOf(BaseItemKind.SERIES, BaseItemKind.EPISODE, BaseItemKind.MOVIE, BaseItemKind.SEASON, BaseItemKind.VIDEO)
-		private const val TRAILER_START_DELAY_MS = 1_900L
+		private const val TRAILER_LOOKUP_DELAY_MS = 900L
+		private const val TRAILER_FADE_IN_AFTER_FOCUS_MS = 4_000L
+		private const val TRAILER_MIN_PRELOAD_MS = 3_000L
 		private const val PREVIEW_BACKDROP_LOAD_DELAY_MS = 220L
 		private const val TRAILER_MAX_DURATION_MS = 45_000L
 		private const val TRAILER_FADE_OUT_MS = 250L
@@ -132,6 +148,7 @@ class HomeFragmentNetflixStyle : Fragment() {
 		private const val MAX_TRAILER_CACHE_ITEMS = 80
 		private const val MAX_TRAILER_MISS_CACHE_ITEMS = 120
 		private val YOUTUBE_ID_REGEX = """(?:v=|/embed/|youtu\.be/|/shorts/)([a-zA-Z0-9_-]{11})""".toRegex()
+		private const val YOUTUBE_EMBED_BASE_URL = "https://www.youtube-nocookie.com"
 		private val YOUTUBE_SEARCH_ID_PATTERNS = listOf(
 			""""videoId":"([a-zA-Z0-9_-]{11})"""".toRegex(),
 			"""/watch\?v=([a-zA-Z0-9_-]{11})""".toRegex(),
@@ -154,6 +171,9 @@ class HomeFragmentNetflixStyle : Fragment() {
 		previewPoster = view.findViewById(R.id.preview_poster)
 		contentView = view.findViewById(R.id.content_view)
 		previewSubtitle = view.findViewById(R.id.preview_subtitle)
+		previewActions = view.findViewById(R.id.preview_actions)
+		previewPlayButton = view.findViewById(R.id.preview_play_button)
+		previewMoreInfoButton = view.findViewById(R.id.preview_more_info_button)
 
 		// Trailer container sopra il previewBackground
 		trailerContainer = view.findViewById<FrameLayout>(R.id.trailer_container).apply {
@@ -163,6 +183,8 @@ class HomeFragmentNetflixStyle : Fragment() {
 		trailerGradientOverlay.visibility = View.GONE
 
 		trailerWebView = view.findViewById<WebView>(R.id.trailer_webview).apply {
+			setLayerType(View.LAYER_TYPE_HARDWARE, null)
+			webChromeClient = WebChromeClient()
 			webViewClient = WebViewClient()
 			settings.loadWithOverviewMode = true
 			settings.useWideViewPort = true
@@ -171,7 +193,7 @@ class HomeFragmentNetflixStyle : Fragment() {
 			settings.javaScriptEnabled = true
 			settings.loadsImagesAutomatically = true
 			settings.setSupportMultipleWindows(false)
-			settings.userAgentString = "Mozilla/5.0 (SMART-TV; Linux; Tizen 6.0) AppleWebKit/537.36 SuperJellyTV"
+			settings.userAgentString = "Mozilla/5.0 (Linux; Android 13; Android TV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 SuperJellyTV"
 			setBackgroundColor(android.graphics.Color.TRANSPARENT)
 		}
 
@@ -221,12 +243,9 @@ class HomeFragmentNetflixStyle : Fragment() {
 	}
 
 	private fun setupRowsFragmentListener() {
-		// Observe selected item changes from HomeRowsFragment
 		homePreviewViewModel.selectedItem
 			.flowWithLifecycle(viewLifecycleOwner.lifecycle, Lifecycle.State.STARTED)
-			.onEach { item ->
-				updatePreviewSection(item)
-			}
+			.onEach { item -> updatePreviewSection(item) }
 			.launchIn(viewLifecycleOwner.lifecycleScope)
 	}
 
@@ -236,14 +255,18 @@ class HomeFragmentNetflixStyle : Fragment() {
 		previewBackdropJob?.cancel()
 
 		if (item == null || item.baseItem == null) {
+			currentPreviewItem = null
 			resetPreview()
 			return
 		}
 
+		currentPreviewItem = item
+		configurePreviewActions(item)
 		val baseItem = item.baseItem
 		val nextItemId = baseItem.id.toString()
 		val changedItem = currentPreviewItemId != nextItemId
 		currentPreviewItemId = nextItemId
+		if (changedItem) currentPreviewStartedAt = SystemClock.uptimeMillis()
 
 		if (changedItem) {
 			// Non svuotiamo subito la WebView mentre si scorre: è la causa principale dei micro-blocchi.
@@ -722,20 +745,23 @@ class HomeFragmentNetflixStyle : Fragment() {
 		trailerContainer.alpha = 0f
 		trailerGradientOverlay.visibility = View.VISIBLE
 
-		val embedUrl = "https://www.youtube.com/embed/$videoId?autoplay=1&mute=1&controls=0&rel=0&modestbranding=1&playsinline=1&enablejsapi=1"
+		val embedHtml = buildYoutubeEmbedHtml(videoId, muted = true, controls = false)
 
 		trailerWebView.webViewClient = object : WebViewClient() {
 			override fun onPageFinished(view: WebView?, url: String?) {
 				super.onPageFinished(view, url)
 				if (!isAdded || getView() == null || !isVisible || itemId != currentPreviewItemId) return
 
+				val pageReadyAt = SystemClock.uptimeMillis()
 				viewLifecycleOwner.lifecycleScope.launch {
-					delay(900)
+					val focusDelay = (currentPreviewStartedAt + TRAILER_FADE_IN_AFTER_FOCUS_MS - pageReadyAt).coerceAtLeast(0L)
+					val preloadDelay = TRAILER_MIN_PRELOAD_MS
+					delay(maxOf(focusDelay, preloadDelay))
 					if (isAdded && itemId == currentPreviewItemId) {
 						trailerFailures = 0
 						trailerContainer.animate()
 							.alpha(1f)
-							.setDuration(250)
+							.setDuration(350)
 							.start()
 					}
 				}
@@ -766,22 +792,7 @@ class HomeFragmentNetflixStyle : Fragment() {
 			}
 		}
 
-		val html = """
-	        <html>
-	        <head>
-	            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-	            <style>
-	                body, html { margin: 0; padding: 0; height: 100%; overflow: hidden; background: black; }
-	                iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
-	            </style>
-	        </head>
-	        <body>
-	            <iframe src="$embedUrl" frameborder="0" allow="autoplay; encrypted-media; fullscreen"></iframe>
-	        </body>
-	        </html>
-	    """.trimIndent()
-
-		trailerWebView.loadDataWithBaseURL("https://www.youtube.com", html, "text/html", "utf-8", null)
+		trailerWebView.loadDataWithBaseURL(YOUTUBE_EMBED_BASE_URL, embedHtml, "text/html", "UTF-8", null)
 
 		trailerHideJob?.cancel()
 		trailerHideJob = viewLifecycleOwner.lifecycleScope.launch {
@@ -848,6 +859,43 @@ class HomeFragmentNetflixStyle : Fragment() {
 	}
 
 
+	private fun configurePreviewActions(item: BaseRowItem) {
+		val baseItem = item.baseItem
+		if (baseItem == null) {
+			previewActions.visibility = View.GONE
+			return
+		}
+
+		previewActions.visibility = View.VISIBLE
+		previewPlayButton.setOnClickListener {
+			if (item is ExternalCatalogBaseRowItem) ExternalCatalogLauncher.open(requireContext(), item)
+			else keyProcessor.handleKey(KeyEvent.KEYCODE_MEDIA_PLAY, item, activity)
+		}
+		previewMoreInfoButton.setOnClickListener {
+			if (item is ExternalCatalogBaseRowItem) ExternalCatalogLauncher.open(requireContext(), item)
+			else navigationRepository.navigate(Destinations.itemDetails(baseItem.id))
+		}
+	}
+
+
+	private fun buildYoutubeEmbedHtml(videoId: String, muted: Boolean, controls: Boolean): String {
+		val mute = if (muted) 1 else 0
+		val controlsFlag = if (controls) 1 else 0
+		val src = "$YOUTUBE_EMBED_BASE_URL/embed/$videoId?autoplay=1&mute=$mute&controls=$controlsFlag&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&origin=https%3A%2F%2Fwww.youtube-nocookie.com"
+		return """
+			<!doctype html>
+			<html>
+			<head>
+				<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+				<style>html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;background:#000;}iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#000;}</style>
+			</head>
+			<body>
+				<iframe src="$src" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" allowfullscreen></iframe>
+			</body>
+			</html>
+		""".trimIndent()
+	}
+
 	private fun resetPreview() {
 		currentPreviewItemId = null
 		currentBackdropUrl = null
@@ -864,6 +912,7 @@ class HomeFragmentNetflixStyle : Fragment() {
 		previewDuration.visibility = View.GONE
 		previewAgeRating.visibility = View.GONE
 		previewSubtitle.visibility = View.GONE
+		previewActions.visibility = View.GONE
 		resetTrailerTimer()
 	}
 
@@ -899,7 +948,7 @@ class HomeFragmentNetflixStyle : Fragment() {
 
 	fun playYouTubeTrailerWithDelay(item: BaseRowItem, expectedItemId: String) {
 		trailerJob = viewLifecycleOwner.lifecycleScope.launch {
-			delay(TRAILER_START_DELAY_MS)
+			delay(TRAILER_LOOKUP_DELAY_MS)
 
 			if (isAdded && isVisible && expectedItemId == currentPreviewItemId && !isTrailerBackoffActive()) {
 				playYouTubeTrailer(item, expectedItemId)

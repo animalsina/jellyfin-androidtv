@@ -2,12 +2,16 @@ package org.jellyfin.androidtv.ui.home
 
 import android.content.Context
 import android.os.Bundle
+import android.os.SystemClock
 import android.view.KeyEvent
 import android.view.MotionEvent
+import android.view.Gravity
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.ViewGroup
+import android.widget.PopupMenu
 import androidx.leanback.app.RowsSupportFragment
+import androidx.leanback.widget.BaseGridView
 import androidx.leanback.widget.ListRow
 import androidx.leanback.widget.OnItemViewClickedListener
 import androidx.leanback.widget.OnItemViewSelectedListener
@@ -22,8 +26,6 @@ import androidx.lifecycle.repeatOnLifecycle
 import org.koin.androidx.viewmodel.ext.android.activityViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
@@ -32,12 +34,11 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
-import kotlinx.coroutines.withTimeoutOrNull
+import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.auth.repository.UserRepository
 import org.jellyfin.androidtv.constant.CustomMessage
 import org.jellyfin.androidtv.constant.HomeSectionType
 import org.jellyfin.androidtv.constant.LiveTvOption
-import org.jellyfin.androidtv.constant.QueryType
 import org.jellyfin.androidtv.data.model.DataRefreshService
 import org.jellyfin.androidtv.data.repository.CustomMessageRepository
 import org.jellyfin.androidtv.data.repository.ExternalCatalogRepository
@@ -48,7 +49,10 @@ import org.jellyfin.androidtv.preference.UserSettingPreferences
 import org.jellyfin.androidtv.ui.GridButton
 import org.jellyfin.androidtv.ui.browsing.CompositeClickedListener
 import org.jellyfin.androidtv.ui.browsing.CompositeSelectedListener
+import org.jellyfin.androidtv.streaming.ExternalCatalogLauncher
+import org.jellyfin.androidtv.streaming.StreamingAvailabilityHelper
 import org.jellyfin.androidtv.ui.itemhandling.BaseRowItem
+import org.jellyfin.androidtv.ui.itemhandling.ExternalCatalogBaseRowItem
 import org.jellyfin.androidtv.ui.itemhandling.ItemLauncher
 import org.jellyfin.androidtv.ui.itemhandling.ItemRowAdapter
 import org.jellyfin.androidtv.ui.itemhandling.refreshItem
@@ -63,20 +67,44 @@ import org.jellyfin.androidtv.util.KeyProcessor
 import org.jellyfin.androidtv.util.TouchNavigationHelper
 import org.jellyfin.playback.core.PlaybackManager
 import org.jellyfin.sdk.api.client.ApiClient
-import org.jellyfin.sdk.api.client.extensions.liveTvApi
 import org.jellyfin.sdk.api.sockets.subscribe
+import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.LibraryChangedMessage
 import org.jellyfin.sdk.model.api.UserDataChangedMessage
 import org.koin.android.ext.android.inject
 import timber.log.Timber
+import java.time.Instant
 import kotlin.math.abs
 import kotlin.time.Duration.Companion.seconds
 
 @Suppress("UNCHECKED_CAST")
 class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyListener {
+	companion object {
+		private const val TOP_MENU_DOUBLE_UP_WINDOW_MS = 850L
+		private const val SOFT_HOME_REFRESH_TTL_MS = 90_000L
+		private const val HOME_ROWS_REBUILD_TTL_MS = 5 * 60_000L
+		private const val MAX_INITIAL_HOME_ROWS = 3
+		private const val MENU_HOME_OPEN_DETAILS = 1001
+		private const val MENU_HOME_PLAY_NOW = 1002
+		private const val MENU_HOME_WHERE_TO_WATCH = 1003
+		private const val MENU_HOME_SEARCH_SERVER = 1004
+		private const val MENU_HOME_MORE_ACTIONS = 1005
+		private val PLAYABLE_CONTEXT_TYPES = setOf(
+			BaseItemKind.MOVIE,
+			BaseItemKind.EPISODE,
+			BaseItemKind.VIDEO,
+			BaseItemKind.AUDIO,
+			BaseItemKind.TV_CHANNEL,
+			BaseItemKind.PROGRAM,
+		)
+	}
+
 	private val api by inject<ApiClient>()
 	private val backgroundService by inject<BackgroundService>()
 	private val playbackManager by inject<PlaybackManager>()
+	private val homeRowsKeyInterceptListener = object : BaseGridView.OnKeyInterceptListener {
+		override fun onInterceptKeyEvent(event: KeyEvent): Boolean = handleHomeRowsKeyIntercept(event)
+	}
 	private val mediaManager by inject<MediaManager>()
 	private val notificationsRepository by inject<NotificationsRepository>()
 	private val userRepository by inject<UserRepository>()
@@ -119,6 +147,12 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	private var selectedPreviewJob: Job? = null
 	private var buildRowsJob: Job? = null
 	private var loadedHomeSections: List<HomeSectionType> = emptyList()
+	private var lastRowsBuildAt = 0L
+	private var lastSoftRefreshAt = 0L
+	private var lastObservedLibraryChange: Instant? = null
+	private var lastToolbarUpRequestAt = 0L
+	private var consumeToolbarUpKeyUp = false
+	private var contextMenuShowing = false
 
 	// Special rows
 	private val notificationsRow by lazy { NotificationsHomeFragmentRow(lifecycleScope, notificationsRepository) }
@@ -177,7 +211,9 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 					Timber.e(e, "WebSocket subscription failed")
 				}
 
-				api.webSocket.subscribe<LibraryChangedMessage>().onEach { buildHomeRows(forceUpdateSettings = false) }.launchIn(this)
+				api.webSocket.subscribe<LibraryChangedMessage>()
+					.onEach { refreshRows(force = true, delayed = true) }
+					.launchIn(this)
 			}
 		}
 
@@ -188,23 +224,29 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
 		super.onViewCreated(view, savedInstanceState)
 
-		if (!useTouchHomeNavigation) return
-
 		verticalGridView?.apply {
-			// Phones/tablets must use normal RecyclerView touch scrolling. The root cause of the
-			// jump-to-top bug is Leanback focus restoration, not RecyclerView touch itself.
-			// Do not consume touch gestures manually: that disables fling/nested scroll and still
-			// lets Leanback restore selectedPosition on later layout passes. Instead remove the
-			// focus contract from the vertical grid and its rows while leaving click listeners intact.
-			isFocusable = false
-			isFocusableInTouchMode = false
-			descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
-			preserveFocusAfterLayout = false
+			if (id == View.NO_ID) id = View.generateViewId()
+			setOnKeyListener(this@HomeRowsFragment)
+			setOnKeyInterceptListener(homeRowsKeyInterceptListener)
+			// Keep more card views attached/cached on Android TV. It reduces the visible "empty card
+			// then image" effect when landing on home and makes row-to-row D-pad movement smoother.
+			setItemViewCacheSize(72)
 			isNestedScrollingEnabled = true
 			isVerticalScrollBarEnabled = true
-			setItemViewCacheSize(20)
-			setOnTouchListener(null)
-			clearFocus()
+
+			if (useTouchHomeNavigation) {
+				// Phones/tablets must use normal RecyclerView touch scrolling. The root cause of the
+				// jump-to-top bug is Leanback focus restoration, not RecyclerView touch itself.
+				// Do not consume touch gestures manually: that disables fling/nested scroll and still
+				// lets Leanback restore selectedPosition on later layout passes. Instead remove the
+				// focus contract from the vertical grid and its rows while leaving click listeners intact.
+				isFocusable = false
+				isFocusableInTouchMode = false
+				descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
+				preserveFocusAfterLayout = false
+				setOnTouchListener(null)
+				clearFocus()
+			}
 		}
 	}
 
@@ -349,37 +391,31 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 
 				if (forceUpdateSettings || userSettingPreferences.shouldUpdate) userSettingPreferences.update()
 				val homeSections = userSettingPreferences.activeHomesections
-				loadedHomeSections = homeSections
-				val userViews = userViewsRepository.views.first()
-				var includeLiveTvRows = false
+				val rowsAdapter = adapter as MutableObjectAdapter<Row>
+				val now = SystemClock.uptimeMillis()
 
-				if (homeSections.contains(HomeSectionType.LIVE_TV) && currentUser.policy?.enableLiveTvAccess == true) {
-					includeLiveTvRows = withTimeoutOrNull(5.seconds) {
-						try {
-							val recommendedPrograms = api.liveTvApi.getRecommendedPrograms(
-								enableTotalRecordCount = false,
-								imageTypeLimit = 1,
-								isAiring = true,
-								limit = 1,
-							).content
-							recommendedPrograms.items.isNotEmpty()
-						} catch (e: Exception) {
-							Timber.w(e, "Live TV probe failed; skipping live rows for this home load")
-							false
-						}
-					} ?: false
+				// Navigating back to home should be instant. Reuse the existing rows unless settings changed
+				// or the cache is old enough that a full structural rebuild is actually useful.
+				if (!forceUpdateSettings && rowsAdapter.size() > 0 && homeSections == loadedHomeSections && now - lastRowsBuildAt < HOME_ROWS_REBUILD_TTL_MS) {
+					return@launch
 				}
 
-				val rowsAdapter = adapter as MutableObjectAdapter<Row>
+				loadedHomeSections = homeSections
+				lastRowsBuildAt = now
+				val userViews = userViewsRepository.views.first()
+				val includeLiveTvRows = homeSections.contains(HomeSectionType.LIVE_TV) && currentUser.policy?.enableLiveTvAccess == true
+
 				val cardPresenter = CardPresenter(true, org.jellyfin.androidtv.constant.ImageType.POSTER, 120)
 				val ctx = context ?: return@launch
 				val recyclerView = verticalGridView
 				var initialPreviewSet = false
 
-				withContext(Dispatchers.Main) {
-					recyclerView?.suppressLayout(true)
-					rowsAdapter.clear()
-					recyclerView?.suppressLayout(false)
+				val prioritySections = homeSections.filter(::isPriorityHomeSection).take(MAX_INITIAL_HOME_ROWS)
+				val deferredSections = homeSections.filterNot { section -> prioritySections.contains(section) }
+				val priorityRows = withContext(Dispatchers.IO) {
+					prioritySections.mapNotNull { section ->
+						if (!isAdded) null else loadRowForSection(section, includeLiveTvRows, userViews)
+					}
 				}
 
 				suspend fun appendRow(row: HomeFragmentRow?) {
@@ -405,19 +441,30 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 					}
 				}
 
-				val prioritySections = homeSections.filter(::isPriorityHomeSection)
-				val deferredSections = homeSections.filterNot(::isPriorityHomeSection)
-
-				for (section in prioritySections) {
-					if (!isAdded) break
-					appendRow(withContext(Dispatchers.IO) { loadRowForSection(section, includeLiveTvRows, userViews) })
-					delay(80)
+				withContext(Dispatchers.Main) {
+					recyclerView?.suppressLayout(true)
+					try {
+						rowsAdapter.clear()
+						priorityRows.forEach { row -> row.addToRowsAdapter(ctx, cardPresenter, rowsAdapter) }
+					} finally {
+						recyclerView?.suppressLayout(false)
+					}
+					recyclerView?.post {
+						val firstRow = rowsAdapter.firstOrNull() as? ListRow
+						val adapterFirstRow = firstRow?.adapter as? ItemRowAdapter
+						val firstItem = adapterFirstRow?.get(0) as? BaseRowItem
+						if (firstItem != null && isAdded) {
+							initialPreviewSet = true
+							backgroundService.setBackground(firstItem.baseItem)
+							homePreviewViewModel.updateSelectedItem(firstItem)
+						}
+					}
 				}
 
 				for (section in deferredSections) {
 					if (!isAdded) break
 					appendRow(withContext(Dispatchers.IO) { loadRowForSection(section, includeLiveTvRows, userViews) })
-					delay(110)
+					delay(75)
 				}
 
 				if (includeLiveTvRows && isAdded) {
@@ -458,6 +505,10 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 			HomeSectionType.POPULAR_MOVIES -> helper.loadPopularMovies(userViews)
 			HomeSectionType.POPULAR_TV -> helper.loadPopularTV(userViews)
 			HomeSectionType.SIMILAR_TO_WATCHED -> helper.loadSimilarToWatched(userViews)
+			HomeSectionType.RANDOM_MOVIES -> helper.loadRandomMovies(userViews)
+			HomeSectionType.RANDOM_SERIES -> helper.loadRandomSeries(userViews)
+			HomeSectionType.UNWATCHED_RANDOM_MOVIES -> helper.loadUnwatchedRandomMovies(userViews)
+			HomeSectionType.LONG_AGO_MOVIES -> helper.loadLongAgoMovies(userViews)
 			HomeSectionType.GENRE_RANDOM_MOVIES -> helper.loadGenreRandomMovies(userViews)
 			HomeSectionType.GENRE_RANDOM_TV -> helper.loadGenreRandomTV(userViews)
 			HomeSectionType.GENRE_RANDOM_MIXED -> helper.loadGenreRandomMixed(userViews)
@@ -465,6 +516,14 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 			HomeSectionType.MOOD_ACTION -> helper.loadMoodAction(userViews)
 			HomeSectionType.MOOD_SHORT -> helper.loadMoodShort(userViews)
 			HomeSectionType.EXTERNAL_PROVIDERS -> helper.loadExternalProviders()
+			HomeSectionType.PLUTO_ACTION -> helper.loadPlutoCategory(getString(R.string.home_section_pluto_action), listOf("action", "azione", "avventura"))
+			HomeSectionType.PLUTO_COMEDY -> helper.loadPlutoCategory(getString(R.string.home_section_pluto_comedy), listOf("comedy", "commedia", "comedie"))
+			HomeSectionType.PLUTO_DRAMA -> helper.loadPlutoCategory(getString(R.string.home_section_pluto_drama), listOf("drama", "drammatico", "drama"))
+			HomeSectionType.PLUTO_THRILLER -> helper.loadPlutoCategory(getString(R.string.home_section_pluto_thriller), listOf("thriller", "crime", "giallo"))
+			HomeSectionType.PLUTO_DOCUMENTARY -> helper.loadPlutoCategory(getString(R.string.home_section_pluto_documentary), listOf("documentary", "documentari", "doc"))
+			HomeSectionType.PLUTO_SCIFI -> helper.loadPlutoCategory(getString(R.string.home_section_pluto_scifi), listOf("sci fi", "fantascienza", "science fiction"))
+			HomeSectionType.RAIPLAY_FILM -> helper.loadRaiPlayFilm(getString(R.string.home_section_raiplay_film))
+			HomeSectionType.RAIPLAY_SERIES -> helper.loadRaiPlaySeries(getString(R.string.home_section_raiplay_series))
 			HomeSectionType.ONLINE_NEW_RELEASES -> helper.loadOnlineNewReleases()
 			else -> null
 		}
@@ -472,9 +531,175 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 
 
 	override fun onKey(v: View?, keyCode: Int, event: KeyEvent?): Boolean {
+		if (isSelectLongPress(keyCode, event)) {
+			showCurrentItemContextMenu(v ?: activity?.currentFocus)
+			return true
+		}
+
+		// DPAD_UP is handled by BaseGridView.OnKeyInterceptListener so Leanback cannot
+		// move focus to the top toolbar before the home row guard has a chance to run.
+		if (keyCode == KeyEvent.KEYCODE_DPAD_UP) return false
+
 		if (event?.action != KeyEvent.ACTION_UP) return false
 		return keyProcessor.handleKey(keyCode, currentItem, activity)
 	}
+
+	private fun handleHomeRowsKeyIntercept(event: KeyEvent): Boolean {
+		if (event.keyCode != KeyEvent.KEYCODE_DPAD_UP) return false
+
+		if (event.action == KeyEvent.ACTION_UP && consumeToolbarUpKeyUp) {
+			consumeToolbarUpKeyUp = false
+			return true
+		}
+
+		if (event.action != KeyEvent.ACTION_DOWN) return false
+
+		if (moveFocusToPreviousHomeRow()) {
+			consumeToolbarUpKeyUp = true
+			return true
+		}
+
+		if (!shouldGateToolbarFocusExit()) {
+			consumeToolbarUpKeyUp = true
+			verticalGridView?.requestFocus()
+			return true
+		}
+
+		val now = SystemClock.uptimeMillis()
+		val allowToolbarExit = now - lastToolbarUpRequestAt <= TOP_MENU_DOUBLE_UP_WINDOW_MS
+		lastToolbarUpRequestAt = now
+
+		if (!allowToolbarExit) {
+			consumeToolbarUpKeyUp = true
+			selectedPosition = 0
+			verticalGridView?.requestFocus()
+			return true
+		}
+
+		consumeToolbarUpKeyUp = false
+		return false
+	}
+
+	private fun isSelectLongPress(keyCode: Int, event: KeyEvent?): Boolean {
+		if (event?.action != KeyEvent.ACTION_DOWN) return false
+		if (keyCode != KeyEvent.KEYCODE_DPAD_CENTER && keyCode != KeyEvent.KEYCODE_ENTER && keyCode != KeyEvent.KEYCODE_NUMPAD_ENTER) return false
+		return event.isLongPress || event.repeatCount > 0
+	}
+
+	private fun showCurrentItemContextMenu(anchor: View?) {
+		if (contextMenuShowing) return
+		val item = currentItem ?: return
+		val activity = activity ?: return
+		val anchorView = anchor ?: activity.currentFocus ?: verticalGridView ?: return
+
+		if (item is ExternalCatalogBaseRowItem) {
+			ExternalCatalogLauncher.open(activity, item)
+			return
+		}
+
+		val baseItem = item.baseItem ?: return
+		val menu = PopupMenu(activity, anchorView, Gravity.END)
+		var order = 0
+		menu.menu.add(0, MENU_HOME_OPEN_DETAILS, order++, R.string.lbl_home_card_open_details)
+		if (baseItem.type in PLAYABLE_CONTEXT_TYPES) {
+			menu.menu.add(0, MENU_HOME_PLAY_NOW, order++, R.string.lbl_home_card_play_now)
+		}
+		if (StreamingAvailabilityHelper.shouldOfferAvailabilityButton(activity, baseItem)) {
+			menu.menu.add(0, MENU_HOME_WHERE_TO_WATCH, order++, R.string.lbl_home_card_where_to_watch)
+		}
+		baseItem.name?.takeIf { it.isNotBlank() }?.let {
+			menu.menu.add(0, MENU_HOME_SEARCH_SERVER, order++, R.string.lbl_home_card_search_server)
+		}
+		menu.menu.add(0, MENU_HOME_MORE_ACTIONS, order, R.string.lbl_home_card_more_actions)
+
+		menu.setOnMenuItemClickListener { menuItem ->
+			when (menuItem.itemId) {
+				MENU_HOME_OPEN_DETAILS -> {
+					navigationRepository.navigate(Destinations.itemDetails(baseItem.id))
+					true
+				}
+				MENU_HOME_PLAY_NOW -> keyProcessor.handleKey(KeyEvent.KEYCODE_MEDIA_PLAY, item, activity)
+				MENU_HOME_WHERE_TO_WATCH -> {
+					StreamingAvailabilityHelper.openAvailabilityMenu(activity, baseItem)
+					true
+				}
+				MENU_HOME_SEARCH_SERVER -> {
+					navigationRepository.navigate(Destinations.search(baseItem.name.orEmpty()))
+					true
+				}
+				MENU_HOME_MORE_ACTIONS -> keyProcessor.handleKey(KeyEvent.KEYCODE_MENU, item, activity)
+				else -> false
+			}
+		}
+		menu.setOnDismissListener { contextMenuShowing = false }
+		contextMenuShowing = true
+		menu.show()
+	}
+
+	private fun moveFocusToPreviousHomeRow(): Boolean {
+		if (useTouchHomeNavigation) return false
+		val recyclerView = verticalGridView ?: return false
+		val rowIndex = resolveFocusedHomeRowIndex()
+		val rowCount = (adapter as? MutableObjectAdapter<Row>)?.size() ?: 0
+
+		if (rowIndex > 0 && rowIndex < rowCount) {
+			val targetRow = rowIndex - 1
+			lastToolbarUpRequestAt = 0L
+			selectedPosition = targetRow
+			setSelectedPosition(targetRow, true)
+			recyclerView.post {
+				recyclerView.requestFocus()
+			}
+			return true
+		}
+
+		if (rowIndex != 0 && recyclerView.canScrollVertically(-1)) {
+			lastToolbarUpRequestAt = 0L
+			recyclerView.smoothScrollBy(0, -maxOf(160, recyclerView.height / 2))
+			recyclerView.post { recyclerView.requestFocus() }
+			return true
+		}
+
+		if (rowIndex == 0 && recyclerView.canScrollVertically(-1)) {
+			lastToolbarUpRequestAt = 0L
+			recyclerView.smoothScrollBy(0, -maxOf(160, recyclerView.height / 2))
+			recyclerView.post { recyclerView.requestFocus() }
+			return true
+		}
+
+		return false
+	}
+
+	private fun shouldGateToolbarFocusExit(): Boolean {
+		if (useTouchHomeNavigation) return false
+		return resolveFocusedHomeRowIndex() == 0 && verticalGridView?.canScrollVertically(-1) != true
+	}
+
+	private fun resolveFocusedHomeRowIndex(): Int {
+		val recyclerView = verticalGridView ?: return selectedPosition
+		val focused = activity?.currentFocus ?: recyclerView.findFocus()
+		if (focused != null) {
+			var parent: View? = focused
+			while (parent != null && parent.parent != recyclerView) {
+				parent = parent.parent as? View
+			}
+			if (parent != null) {
+				val adapterPosition = recyclerView.getChildAdapterPosition(parent)
+				if (adapterPosition != RecyclerView.NO_POSITION) return adapterPosition
+			}
+		}
+
+		val leanbackSelected = selectedPosition
+		if (leanbackSelected >= 0) return leanbackSelected
+
+		currentRow?.let { row ->
+			val index = (adapter as? MutableObjectAdapter<Row>)?.indexOf(row) ?: -1
+			if (index >= 0) return index
+		}
+
+		return -1
+	}
+
 
 	/**
 	 * Called when the fragment is resumed.
@@ -500,14 +725,16 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 				if (userSettingPreferences.activeHomesections != loadedHomeSections) {
 					buildHomeRows(forceUpdateSettings = false)
 				} else {
-					// Re-retrieve anything that needs it but delay slightly so we don't take away gui landing
 					refreshCurrentItem()
-					refreshRows()
+					val libraryChanged = dataRefreshService.lastLibraryChange != lastObservedLibraryChange
+					val refreshExpired = SystemClock.uptimeMillis() - lastSoftRefreshAt > SOFT_HOME_REFRESH_TTL_MS
+					if (libraryChanged || refreshExpired) refreshRows(force = libraryChanged, delayed = true)
 				}
 			}
 		} else {
 			justLoaded = false
 		}
+
 
 		// Update audio queue
 		Timber.i("Updating audio queue in HomeFragment (onResume)")
@@ -522,6 +749,8 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	}
 
 	private fun refreshRows(force: Boolean = false, delayed: Boolean = true) {
+		lastSoftRefreshAt = SystemClock.uptimeMillis()
+		lastObservedLibraryChange = dataRefreshService.lastLibraryChange
 		lifecycleScope.launch(Dispatchers.IO) {
 			if (delayed) delay(1.5.seconds)
 

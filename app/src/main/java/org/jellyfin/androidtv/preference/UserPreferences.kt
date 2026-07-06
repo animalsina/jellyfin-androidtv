@@ -225,7 +225,7 @@ class UserPreferences(context: Context) : SharedPreferenceStore(
 		var videoStartDelay = longPreference("video_start_delay", 0)
 
 		/**
-		 * Whether to enable audio in trailers.
+		 * Whether to enable automatic trailer previews.
 		 */
 		var trailerEnabled = booleanPreference("trailer_enabled", true)
 

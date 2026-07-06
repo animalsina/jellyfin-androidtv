@@ -56,7 +56,7 @@ fun <T : Any> ItemRowAdapter.setItems(
 		transform(item, safeLoadedCount + index)
 	}
 
-	val allItems = buildList<BaseRowItem> {
+	val allItems = buildList {
 		// Keep the currently visible prefix intact. Reusing the same object instances avoids Leanback
 		// treating the entire carousel as a new list while the user is scrolling on touch/mobile devices.
 		addAll(existingItems.take(safeLoadedCount))
@@ -300,7 +300,7 @@ fun ItemRowAdapter.retrieveUpcomingEpisodes(api: ApiClient, query: GetUpcomingEp
 
 			setItems(
 				items = response.items,
-				transform = { item, _ -> 
+				transform = { item, _ ->
 					BaseItemDtoBaseRowItem(
 						item,
 						preferParentThumb,
@@ -328,7 +328,7 @@ fun ItemRowAdapter.retrieveSimilarItems(api: ApiClient, query: GetSimilarItemsRe
 
 			setItems(
 				items = response.items,
-				transform = { item, _ -> 
+				transform = { item, _ ->
 					BaseItemDtoBaseRowItem(
 						item,
 						preferParentThumb,

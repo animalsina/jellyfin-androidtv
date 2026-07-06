@@ -5,35 +5,57 @@ import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.constant.ExternalProviderOption
+import org.jellyfin.androidtv.data.model.ExternalCatalogItem
+import org.jellyfin.androidtv.data.repository.ExternalCatalogRepository
+import org.jellyfin.androidtv.ui.playback.ExternalStreamPlayerActivity
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
+import org.koin.java.KoinJavaComponent
 import timber.log.Timber
 import java.net.URLEncoder
 
 object StreamingAvailabilityHelper {
+	private val externalCatalogRepository by KoinJavaComponent.inject<ExternalCatalogRepository>(ExternalCatalogRepository::class.java)
+	private val availabilityScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
 	@JvmStatic
 	fun shouldOfferAvailabilityButton(context: Context, item: BaseItemDto?): Boolean {
 		if (!isSupportedItem(item)) return false
-		return buildActions(context, item).isNotEmpty()
+		return getTitle(item).isNotBlank()
 	}
 
 	@JvmStatic
 	fun openAvailabilityMenu(context: Context, item: BaseItemDto?) {
 		if (!isSupportedItem(item)) return
-		val actions = buildActions(context, item)
-		if (actions.isEmpty()) {
-			Toast.makeText(context, R.string.msg_streaming_no_installed_provider, Toast.LENGTH_SHORT).show()
-			return
-		}
+		val title = getTitle(item)
+		if (title.isBlank()) return
 
-		AlertDialog.Builder(context)
-			.setTitle(context.getString(R.string.lbl_streaming_availability))
-			.setItems(actions.map { it.label }.toTypedArray()) { _, index ->
-				openAction(context, actions[index])
+		availabilityScope.launch {
+			val catalogMatches = withContext(Dispatchers.IO) {
+				runCatching { externalCatalogRepository.findFreeCatalogMatches(title) }
+					.onFailure { Timber.w(it, "Unable to search free external catalog matches") }
+					.getOrDefault(emptyList())
 			}
-			.show()
+			val actions = buildActions(context, item, catalogMatches)
+			if (actions.isEmpty()) {
+				Toast.makeText(context, R.string.msg_streaming_no_installed_provider, Toast.LENGTH_SHORT).show()
+				return@launch
+			}
+
+			AlertDialog.Builder(context)
+				.setTitle(context.getString(R.string.lbl_streaming_availability))
+				.setItems(actions.map { it.label }.toTypedArray()) { _, index ->
+					openAction(context, actions[index])
+				}
+				.show()
+		}
 	}
 
 	private fun isSupportedItem(item: BaseItemDto?): Boolean = when (item?.type) {
@@ -41,14 +63,33 @@ object StreamingAvailabilityHelper {
 		else -> false
 	}
 
-	private fun buildActions(context: Context, item: BaseItemDto?): List<ProviderAction> {
-		val title = item?.let { if (it.type == BaseItemKind.EPISODE) it.seriesName ?: it.name else it.name }.orEmpty().trim()
+	private fun getTitle(item: BaseItemDto?): String = item
+		?.let { if (it.type == BaseItemKind.EPISODE) it.seriesName ?: it.name else it.name }
+		.orEmpty()
+		.trim()
+
+	private fun buildActions(context: Context, item: BaseItemDto?, catalogMatches: List<ExternalCatalogItem>): List<ProviderAction> {
+		val title = getTitle(item)
 		if (title.isBlank()) return emptyList()
 
-		val encoded = URLEncoder.encode(title, "UTF-8")
+		val searchQuery = listOfNotNull(title, item?.productionYear?.toString()).joinToString(" ")
+		val encoded = URLEncoder.encode(searchQuery, "UTF-8")
 		val actions = mutableListOf<ProviderAction>()
 
-		// JustWatch is the only sane generic availability entry point without embedding a private/scraped provider API key.
+		catalogMatches.forEach { catalogItem ->
+			val streamUrl = catalogItem.streamUrl
+			if (!streamUrl.isNullOrBlank()) {
+				actions += ProviderAction(
+					label = context.getString(R.string.lbl_streaming_play_free_on, catalogItem.providerName),
+					url = streamUrl,
+					internalStream = true,
+					title = catalogItem.title,
+				)
+			}
+		}
+
+		// JustWatch/TMDb style provider data needs a licensed/partner API key for exact availability.
+		// Until that is configured, this is the safest generic availability entry point.
 		actions += ProviderAction(
 			label = context.getString(R.string.lbl_streaming_search_free_sources),
 			url = "https://www.justwatch.com/it/cerca?q=$encoded",
@@ -96,6 +137,20 @@ object StreamingAvailabilityHelper {
 	}
 
 	private fun openAction(context: Context, action: ProviderAction) {
+		if (action.internalStream) {
+			try {
+				context.startActivity(
+					Intent(context, ExternalStreamPlayerActivity::class.java)
+						.putExtra(ExternalStreamPlayerActivity.EXTRA_URL, action.url)
+						.putExtra(ExternalStreamPlayerActivity.EXTRA_TITLE, action.title)
+						.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+				)
+				return
+			} catch (error: Exception) {
+				Timber.w(error, "Unable to open free stream internally")
+			}
+		}
+
 		try {
 			val intent = Intent(Intent.ACTION_VIEW, Uri.parse(action.url))
 				.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -118,5 +173,7 @@ object StreamingAvailabilityHelper {
 		val label: String,
 		val url: String,
 		val packageName: String? = null,
+		val internalStream: Boolean = false,
+		val title: String = "",
 	)
 }

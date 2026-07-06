@@ -366,6 +366,7 @@
     <string name="lbl_streaming_availability">Dove guardarlo</string>
     <string name="lbl_streaming_search_free_sources">Cerca fonti gratis/incluse online</string>
     <string name="lbl_streaming_search_on_provider">Cerca su %1$s</string>
+    <string name="lbl_streaming_play_free_on">Riproduci gratis su %1$s</string>
     <string name="msg_streaming_no_installed_provider">Nessuna app streaming supportata è installata su questo dispositivo.</string>
     <string name="msg_external_catalog_unavailable">Impossibile aprire questo contenuto esterno.</string>
     <string name="home_section_external_providers">Cataloghi streaming</string>
@@ -615,6 +616,10 @@
     <string name="home_section_popular_movies">Film Popolari</string>
     <string name="home_section_popular_tv">Serie TV Popolari</string>
     <string name="home_section_similar_to_watched">Simili a ciò che hai guardato</string>
+    <string name="home_section_random_movies">Film casuali</string>
+    <string name="home_section_random_series">Serie casuali</string>
+    <string name="home_section_unwatched_random_movies">Film mai visti a caso</string>
+    <string name="home_section_long_ago_movies">Film che non vedo da tanto</string>
     <string name="home_section_genre_random_movies">Film per genere</string>
     <string name="home_section_genre_random_tv">Serie TV per genere</string>
     <string name="home_section_genre_random_mixed">Film e Serie TV per genere</string>

@@ -42,6 +42,13 @@
     <string name="lbl_play">Play</string>
     <string name="lbl_pause">Pause</string>
     <string name="lbl_exit">Exit</string>
+    <string name="msg_press_back_twice_to_exit">Premi di nuovo Back entro 5 secondi per uscire da SuperJelly.</string>
+    <string name="lbl_home_card_menu_title">Azioni rapide</string>
+    <string name="lbl_home_card_open_details">Apri scheda</string>
+    <string name="lbl_home_card_play_now">Riproduci</string>
+    <string name="lbl_home_card_where_to_watch">Dove guardarlo</string>
+    <string name="lbl_home_card_search_server">Cerca nel server</string>
+	<string name="lbl_home_card_more_actions">Altre azioni</string>
     <string name="lbl_cancel">Cancel</string>
     <string name="lbl_cancel_recording">Cancel recording</string>
     <string name="lbl_cancel_series">Cancel series</string>
@@ -215,10 +222,19 @@
     <string name="msg_external_provider_missing">App not installed. Opening Play Store.</string>
     <string name="msg_external_provider_unavailable">Unable to open this provider on this device.</string>
     <string name="home_section_external_catalog">Free streaming catalog</string>
+    <string name="home_section_pluto_action">Pluto TV - Action</string>
+    <string name="home_section_pluto_comedy">Pluto TV - Comedy</string>
+    <string name="home_section_pluto_drama">Pluto TV - Drama</string>
+    <string name="home_section_pluto_thriller">Pluto TV - Thriller</string>
+    <string name="home_section_pluto_documentary">Pluto TV - Documentaries</string>
+    <string name="home_section_pluto_scifi">Pluto TV - Sci-Fi</string>
+    <string name="home_section_raiplay_film">RaiPlay - Film</string>
+    <string name="home_section_raiplay_series">RaiPlay - Series</string>
     <string name="lbl_external_catalog_free_badge">Free</string>
     <string name="lbl_streaming_availability">Where to watch</string>
     <string name="lbl_streaming_search_free_sources">Search free/included sources online</string>
     <string name="lbl_streaming_search_on_provider">Search on %1$s</string>
+    <string name="lbl_streaming_play_free_on">Play free on %1$s</string>
     <string name="msg_streaming_no_installed_provider">No supported streaming app is installed on this device.</string>
 
     <string name="home_section_online_new_releases">New online releases</string>
@@ -443,6 +459,10 @@
     <string name="home_section_popular_movies">Popular movies</string>
     <string name="home_section_popular_tv">Popular TV shows</string>
     <string name="home_section_similar_to_watched">More like this</string>
+    <string name="home_section_random_movies">Random movies</string>
+    <string name="home_section_random_series">Random series</string>
+    <string name="home_section_unwatched_random_movies">Random unwatched movies</string>
+    <string name="home_section_long_ago_movies">Movies not watched in a while</string>
     <string name="home_section_genre_random_movies">Genre movies</string>
     <string name="home_section_genre_random_tv">Genre TV shows</string>
     <string name="home_section_genre_random_mixed">Genre mix</string>

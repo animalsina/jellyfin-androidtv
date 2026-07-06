@@ -51,6 +51,7 @@ import org.jellyfin.design.Tokens
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.koin.compose.koinInject
+import kotlin.time.Duration.Companion.milliseconds
 
 open class CardPresenter(
 	val showInfo: Boolean,
@@ -313,8 +314,12 @@ private fun CardViewHolderContent(
 							maxWidth = with(localDensity) { size.width.roundToPx() },
 							maxHeight = with(localDensity) { size.height.roundToPx() },
 						),
-						blurHash = image?.blurHash,
+						// BlurHash decoding for dozens of TV cards caused visible row-to-row stalls.
+						// Let Coil show the cached image/placeholder directly and reserve blurhash for large preview art.
+						blurHash = null,
 						aspectRatio = aspectRatio,
+						blurHashResolution = 10,
+						crossFadeDuration = 0.milliseconds,
 						scaleType = displayConfig.scaleType ?: ImageView.ScaleType.CENTER_CROP,
 						modifier = Modifier
 							.fillMaxSize()

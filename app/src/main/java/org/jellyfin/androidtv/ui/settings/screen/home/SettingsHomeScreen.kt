@@ -26,6 +26,7 @@ fun SettingsHomeScreen() {
 			)
 		}
 
+
 		itemsIndexed(userSettingPreferences.homesections) { index, section ->
 			ListButton(
 				headingContent = { Text(stringResource(R.string.home_section_i, index + 1)) },
