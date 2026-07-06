@@ -342,12 +342,12 @@ private fun CardViewHolderContent(
 				}
 			},
 			overlay = {
-				val showInfo = !usePreview && item.showCardInfoOverlay
+				val showOverlayInfo = item.showCardInfoOverlay
 				item.baseItem?.let { baseItem ->
 					ItemCardBaseItemOverlay(
 						item = baseItem,
 						footer = {
-							if (showInfo && title != null) {
+							if (showOverlayInfo && title != null) {
 								val focusModifier = if (focused) Modifier.basicMarquee(
 									iterations = Int.MAX_VALUE,
 									initialDelayMillis = 0,
@@ -356,11 +356,11 @@ private fun CardViewHolderContent(
 								Box(
 									modifier = Modifier
 										.fillMaxWidth()
-										.background(Tokens.Color.colorBluegrey900.copy(alpha = 0.6f), JellyfinTheme.shapes.extraSmall),
+										.background(Tokens.Color.colorBluegrey900.copy(alpha = 0.7f), JellyfinTheme.shapes.extraSmall),
 								) {
 									Text(
 										text = title,
-										maxLines = 1,
+										maxLines = 2,
 										overflow = TextOverflow.Ellipsis,
 										textAlign = TextAlign.Center,
 										color = Tokens.Color.colorWhite,

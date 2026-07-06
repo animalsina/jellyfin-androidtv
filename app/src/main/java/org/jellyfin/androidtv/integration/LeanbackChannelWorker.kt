@@ -604,7 +604,7 @@ class LeanbackChannelWorker(
 			.sortedByDescending { (_, groupItems) -> groupItems.size }
 			.take(PROJECTIVY_EXTERNAL_CHANNEL_LIMIT)
 			.mapNotNull { (title, groupItems) ->
-				val limited = groupItems.take(PROJECTIVY_CHANNEL_ITEM_LIMIT)
+				val limited = groupItems.take(PROJECTIVY_CHANNEL_ITEM_LIMIT * 2)
 				if (limited.isEmpty()) null else ExternalCatalogChannel(sanitizeChannelKey(title), title, limited)
 			}
 	}
@@ -626,7 +626,7 @@ class LeanbackChannelWorker(
 		.take(48)
 
 	private suspend fun getExternalCatalogItems(): List<ExternalCatalogItem> = withContext(Dispatchers.IO) {
-		runCatching { externalCatalogRepository.loadHomeCatalog(limit = 240) }
+		runCatching { externalCatalogRepository.loadHomeCatalog(limit = 1000) }
 			.onFailure { Timber.w(it, "Unable to populate external catalog Android TV channel") }
 			.getOrDefault(emptyList())
 	}

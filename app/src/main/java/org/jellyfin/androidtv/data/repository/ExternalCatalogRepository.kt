@@ -316,13 +316,21 @@ class ExternalCatalogRepository(
 					val item = pending
 					pending = null
 					if (item != null) {
+						val plutoIdMatch = if (source.id.startsWith("pluto")) PLUTO_ID_REGEX.find(line) else null
+						val plutoId = plutoIdMatch?.groupValues?.get(2)
+						val plutoType = plutoIdMatch?.groupValues?.get(1) // episode, movie, series
+
 						val posterArtwork = item.logo?.takeUnless(::isProviderLogo)
+							?: plutoId?.let { id -> "https://images.pluto.tv/${plutoType}s/$id/poster.jpg?fill=around&fit=fill&palette=ext&width=400&height=600" }
+
 						val backdropArtwork = item.backdrop?.takeUnless(::isProviderLogo)
+							?: plutoId?.let { id -> "https://images.pluto.tv/${plutoType}s/$id/featured.jpg?fill=around&fit=fill&palette=ext&width=1280&height=720" }
+
 						result += ExternalCatalogItem(
 							providerId = source.id,
 							providerName = source.name,
 							title = item.title,
-							type = source.type,
+							type = if (plutoType == "series") BaseItemKind.SERIES else source.type,
 							streamUrl = line,
 							detailUrl = source.detailUrl,
 							posterUrl = posterArtwork,
@@ -497,12 +505,13 @@ class ExternalCatalogRepository(
 		private const val KEY_LAST_TITLES = "last_titles"
 		private const val DEFAULT_LIMIT = 96
 		private const val NEW_RELEASES_LIMIT = 36
-		private const val METADATA_ENRICH_LIMIT = 36
+		private const val METADATA_ENRICH_LIMIT = 150
 		private val MEMORY_CACHE_TTL_MS = TimeUnit.MINUTES.toMillis(30)
 		private val NEW_RELEASES_MEMORY_CACHE_TTL_MS = TimeUnit.MINUTES.toMillis(15)
 		private const val NETWORK_TIMEOUT_MS = 5_000
 		private val ATTRIBUTE_REGEX = "([a-zA-Z0-9_-]+)=\"([^\"]*)\"".toRegex()
 		private val WIKIDATA_QID_REGEX = "Q\\d+".toRegex()
+		private val PLUTO_ID_REGEX = "/(episode|movie|series)/([a-f0-9]{24})/".toRegex()
 		private val RAIPLAY_BLOCK_REGEX = Regex("""<h[2-4][^>]*>.*?</h[2-4]>|<a[^>]+href\s*=\s*[\"'][^\"']+[\"'][^>]*>.*?</a>""", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
 		private val RAIPLAY_TITLE_BLACKLIST = setOf(
 			"homepage", "dirette", "catalogo", "film", "serie italiane", "serie internazionali", "programmi",
