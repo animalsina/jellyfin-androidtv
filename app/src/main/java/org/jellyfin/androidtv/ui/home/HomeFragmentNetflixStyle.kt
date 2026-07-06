@@ -133,7 +133,7 @@ class HomeFragmentNetflixStyle : Fragment() {
 		private const val MAX_TRAILER_MISS_CACHE_ITEMS = 120
 		private val YOUTUBE_ID_REGEX = """(?:v=|/embed/|youtu\.be/|/shorts/)([a-zA-Z0-9_-]{11})""".toRegex()
 		private val YOUTUBE_SEARCH_ID_PATTERNS = listOf(
-			"""\"videoId\":\"([a-zA-Z0-9_-]{11})\""".toRegex(),
+			""""videoId":"([a-zA-Z0-9_-]{11})"""".toRegex(),
 			"""/watch\?v=([a-zA-Z0-9_-]{11})""".toRegex(),
 			"""watchEndpoint":\{"videoId":"([a-zA-Z0-9_-]{11})""".toRegex(),
 		)
