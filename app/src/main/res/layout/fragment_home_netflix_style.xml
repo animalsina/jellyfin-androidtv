@@ -224,7 +224,7 @@
                         android:textSize="18sp"
                         android:fontFamily="sans-serif-medium"
                         android:textAllCaps="false"
-                        android:textColor="@android:color/black"
+                        android:textColor="@color/button_glass_text_light"
                         android:background="@drawable/button_glass_light"
                         android:layout_marginEnd="16dp"
                         style="@style/Widget.AppCompat.Button" />
@@ -239,7 +239,7 @@
                         android:textSize="18sp"
                         android:fontFamily="sans-serif-medium"
                         android:textAllCaps="false"
-                        android:textColor="@android:color/white"
+                        android:textColor="@color/button_glass_text_dark"
                         android:background="@drawable/button_glass_dark"
                         style="@style/Widget.AppCompat.Button" />
                 </LinearLayout>

@@ -18,6 +18,7 @@ import org.jellyfin.androidtv.BuildConfig
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.util.AndroidVersion
 import org.koin.android.ext.android.inject
+import timber.log.Timber
 import java.io.IOException
 
 class ImageProvider : ContentProvider() {
@@ -32,29 +33,43 @@ class ImageProvider : ContentProvider() {
 	override fun delete(uri: Uri, selection: String?, selectionArgs: Array<out String>?) = 0
 
 	override fun openFile(uri: Uri, mode: String): ParcelFileDescriptor? {
-		val src = requireNotNull(uri.getQueryParameter("src")).toUri()
+		val src = uri.getQueryParameter("src")?.toUri() ?: return null
 
-		val (read, write) = ParcelFileDescriptor.createPipe()
+		val pipe = try {
+			ParcelFileDescriptor.createPipe()
+		} catch (e: IOException) {
+			Timber.e(e, "Could not create pipe for ImageProvider")
+			return null
+		}
+
+		val (read, write) = pipe
 		val outputStream = ParcelFileDescriptor.AutoCloseOutputStream(write)
 
-		imageLoader.enqueue(
-			ImageRequest.Builder(context!!)
-				.data(src)
-				.diskCachePolicy(CachePolicy.ENABLED)   // cache persistente su disco
-				.memoryCachePolicy(CachePolicy.ENABLED) // cache in RAM
-				.error(R.drawable.placeholder_icon)
-				.target(
-					onSuccess = { image ->
-						writeDrawable(image.asDrawable(context!!.resources), outputStream)
-					},
-					onError = { image ->
-						val fallback = image?.asDrawable(context!!.resources)
-							?: AppCompatResources.getDrawable(context!!, R.drawable.placeholder_icon)!!
-						writeDrawable(fallback, outputStream)
-					}
-				)
-				.build()
-		)
+		val ctx = context ?: return null
+
+		try {
+			imageLoader.enqueue(
+				ImageRequest.Builder(ctx)
+					.data(src)
+					.diskCachePolicy(CachePolicy.ENABLED)
+					.memoryCachePolicy(CachePolicy.ENABLED)
+					.error(R.drawable.placeholder_icon)
+					.target(
+						onSuccess = { image ->
+							writeDrawable(image.asDrawable(ctx.resources), outputStream)
+						},
+						onError = { image ->
+							val fallback = image?.asDrawable(ctx.resources)
+								?: AppCompatResources.getDrawable(ctx, R.drawable.placeholder_icon)!!
+							writeDrawable(fallback, outputStream)
+						}
+					)
+					.build()
+			)
+		} catch (e: Exception) {
+			Timber.e(e, "Error enqueuing image request in ImageProvider")
+			try { outputStream.close() } catch (_: Exception) {}
+		}
 
 		return read
 	}
@@ -71,10 +86,16 @@ class ImageProvider : ContentProvider() {
 
 		try {
 			outputStream.use {
-				drawable.toBitmap().compress(format, COMPRESSION_QUALITY, it)
+				val bitmap = drawable.toBitmap().let { bmp ->
+					// Assicuriamoci che il bitmap sia valido per la compressione
+					if (bmp.width > 0 && bmp.height > 0) bmp
+					else null
+				}
+				bitmap?.compress(format, COMPRESSION_QUALITY, it)
 			}
-		} catch (_: IOException) {
-			// Ignora: capita quando la richiesta viene annullata
+		} catch (e: Exception) {
+			Timber.w("Error writing drawable to pipe: ${e.message}")
+			// Non rilanciare l'eccezione per evitare crash del provider chiamato dal sistema
 		}
 	}
 

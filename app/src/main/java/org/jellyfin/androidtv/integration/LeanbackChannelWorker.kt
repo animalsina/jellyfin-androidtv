@@ -673,9 +673,6 @@ class LeanbackChannelWorker(
 			.setIntent(Intent(context, StartupActivity::class.java).apply {
 				item.localItemId?.let { putExtra(StartupActivity.EXTRA_ITEM_ID, it.toString()) }
 			})
-			.apply {
-				item.trailerUrl?.let { setPreviewVideoUri(Uri.parse(it)) }
-			}
 			.build()
 			.toContentValues()
 	}
@@ -831,23 +828,14 @@ class LeanbackChannelWorker(
 			})
 			.setDurationMillis(
 				if (item.runTimeTicks?.ticks != null) {
-					// If we are resuming, we need to show remaining time, cause GoogleTV
-					// ignores setLastPlaybackPositionMillis
 					val duration = item.runTimeTicks?.ticks ?: Duration.ZERO
-					val playbackPosition = item.userData?.playbackPositionTicks?.ticks
-						?: Duration.ZERO
+					val playbackPosition = item.userData?.playbackPositionTicks?.ticks ?: Duration.ZERO
 					(duration - playbackPosition).inWholeMilliseconds.toInt()
 				} else 0
 			)
 			.apply {
-				if ((item.parentIndexNumber ?: 0) > 0)
-					setSeasonNumber(seasonString, item.parentIndexNumber!!)
-				if ((item.indexNumber ?: 0) > 0)
-					setEpisodeNumber(episodeString, item.indexNumber!!)
-
-				item.remoteTrailers?.firstOrNull()?.url?.let {
-					setPreviewVideoUri(Uri.parse(it))
-				}
+				if ((item.parentIndexNumber ?: 0) > 0) setSeasonNumber(seasonString, item.parentIndexNumber!!)
+				if ((item.indexNumber ?: 0) > 0) setEpisodeNumber(episodeString, item.indexNumber!!)
 			}.build().toContentValues()
 	}
 

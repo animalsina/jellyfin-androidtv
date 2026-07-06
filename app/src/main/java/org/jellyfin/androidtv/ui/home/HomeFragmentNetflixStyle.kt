@@ -991,6 +991,20 @@ class HomeFragmentNetflixStyle : Fragment() {
 		return active
 	}
 
+	override fun onResume() {
+		super.onResume()
+		if (::trailerWebView.isInitialized) {
+			trailerWebView.onResume()
+		}
+	}
+
+	override fun onPause() {
+		if (::trailerWebView.isInitialized) {
+			trailerWebView.onPause()
+		}
+		super.onPause()
+	}
+
 	override fun onDestroyView() {
 		resetTrailerTimer()
 		cancelTrailerHide()

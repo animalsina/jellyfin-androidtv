@@ -425,16 +425,21 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 						val rowCountBefore = rowsAdapter.size()
 						row.addToRowsAdapter(ctx, cardPresenter, rowsAdapter)
 						if (rowsAdapter.size() == rowCountBefore) return@withContext
-						recyclerView?.post { restoreTouchScrollAnchor(recyclerView, touchScrollAnchor) }
+						recyclerView?.post {
+							val view = recyclerView ?: return@post
+							restoreTouchScrollAnchor(view, touchScrollAnchor)
+						}
 						if (!initialPreviewSet) {
 							initialPreviewSet = true
 							recyclerView?.post {
 								val firstRow = rowsAdapter.firstOrNull() as? ListRow
 								val adapterFirstRow = firstRow?.adapter as? ItemRowAdapter
-								val firstItem = adapterFirstRow?.get(0) as? BaseRowItem
-								if (firstItem != null && isAdded) {
-									backgroundService.setBackground(firstItem.baseItem)
-									homePreviewViewModel.updateSelectedItem(firstItem)
+								if (adapterFirstRow != null && adapterFirstRow.size() > 0) {
+									val firstItem = adapterFirstRow.get(0) as? BaseRowItem
+									if (firstItem != null && isAdded) {
+										backgroundService.setBackground(firstItem.baseItem)
+										homePreviewViewModel.updateSelectedItem(firstItem)
+									}
 								}
 							}
 						}
@@ -442,21 +447,18 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 				}
 
 				withContext(Dispatchers.Main) {
-					recyclerView?.suppressLayout(true)
-					try {
-						rowsAdapter.clear()
-						priorityRows.forEach { row -> row.addToRowsAdapter(ctx, cardPresenter, rowsAdapter) }
-					} finally {
-						recyclerView?.suppressLayout(false)
-					}
+					rowsAdapter.clear()
+					priorityRows.forEach { row -> row.addToRowsAdapter(ctx, cardPresenter, rowsAdapter) }
 					recyclerView?.post {
 						val firstRow = rowsAdapter.firstOrNull() as? ListRow
 						val adapterFirstRow = firstRow?.adapter as? ItemRowAdapter
-						val firstItem = adapterFirstRow?.get(0) as? BaseRowItem
-						if (firstItem != null && isAdded) {
-							initialPreviewSet = true
-							backgroundService.setBackground(firstItem.baseItem)
-							homePreviewViewModel.updateSelectedItem(firstItem)
+						if (adapterFirstRow != null && adapterFirstRow.size() > 0) {
+							val firstItem = adapterFirstRow.get(0) as? BaseRowItem
+							if (firstItem != null && isAdded) {
+								initialPreviewSet = true
+								backgroundService.setBackground(firstItem.baseItem)
+								homePreviewViewModel.updateSelectedItem(firstItem)
+							}
 						}
 					}
 				}
@@ -751,13 +753,16 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	private fun refreshRows(force: Boolean = false, delayed: Boolean = true) {
 		lastSoftRefreshAt = SystemClock.uptimeMillis()
 		lastObservedLibraryChange = dataRefreshService.lastLibraryChange
-		lifecycleScope.launch(Dispatchers.IO) {
-			if (delayed) delay(1.5.seconds)
+		lifecycleScope.launch(Dispatchers.Main) {
+			if (delayed) delay(1500)
 
-			repeat(adapter.size()) { i ->
-				val rowAdapter = (adapter[i] as? ListRow)?.adapter as? ItemRowAdapter
-				if (force) rowAdapter?.Retrieve()
-				else rowAdapter?.ReRetrieveIfNeeded()
+			val rows = (adapter as? MutableObjectAdapter<Row>)?.toList() ?: return@launch
+			withContext(Dispatchers.IO) {
+				rows.forEach { row ->
+					val rowAdapter = (row as? ListRow)?.adapter as? ItemRowAdapter
+					if (force) rowAdapter?.Retrieve()
+					else rowAdapter?.ReRetrieveIfNeeded()
+				}
 			}
 		}
 	}
