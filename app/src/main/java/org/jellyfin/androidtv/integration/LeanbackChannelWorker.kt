@@ -43,7 +43,9 @@ import org.jellyfin.androidtv.ui.startup.StartupActivity
 import org.jellyfin.androidtv.util.AndroidVersion
 import org.jellyfin.androidtv.util.ImageHelper
 import org.jellyfin.androidtv.util.apiclient.getUrl
+import org.jellyfin.androidtv.util.apiclient.itemBackdropImages
 import org.jellyfin.androidtv.util.apiclient.itemImages
+import org.jellyfin.androidtv.util.apiclient.parentBackdropImages
 import org.jellyfin.androidtv.util.apiclient.parentImages
 import org.jellyfin.androidtv.util.dp
 import org.jellyfin.androidtv.util.sdk.isUsable
@@ -282,9 +284,12 @@ class LeanbackChannelWorker(
 				if (channel != null) {
 					collectForPrefetch(channelData.items)
 					val contentValues = channelData.items.mapNotNull { item ->
+						val isWide = channelData.key == HomeSectionType.RECOMMENDED_FOR_YOU.serializedName ||
+									 channelData.key == HomeSectionType.TRENDING_THIS_WEEK.serializedName ||
+									 channelData.key.startsWith("genre_")
 						when (item) {
-							is BaseItemDto -> createPreviewProgram(channel, item, preferParentThumb)
-							is ExternalCatalogItem -> createExternalPreviewProgram(channel, item)
+							is BaseItemDto -> createPreviewProgram(channel, item, preferParentThumb, useWideAspect = isWide)
+							is ExternalCatalogItem -> createExternalPreviewProgram(channel, item, useWideAspect = isWide)
 							else -> null
 						}
 					}.toTypedArray()
@@ -642,8 +647,12 @@ class LeanbackChannelWorker(
 	}
 
 	@SuppressLint("RestrictedApi")
-	private fun createExternalPreviewProgram(channelUri: Uri, item: ExternalCatalogItem): ContentValues {
-		val artwork = item.posterUrl ?: item.backdropUrl ?: imageHelper.getResourceUrl(context, R.drawable.tile_land_tv)
+	private fun createExternalPreviewProgram(channelUri: Uri, item: ExternalCatalogItem, useWideAspect: Boolean = false): ContentValues {
+		val artwork = if (useWideAspect) {
+			item.backdropUrl ?: item.posterUrl ?: imageHelper.getResourceUrl(context, R.drawable.tile_land_tv)
+		} else {
+			item.posterUrl ?: item.backdropUrl ?: imageHelper.getResourceUrl(context, R.drawable.tile_land_tv)
+		}
 		return PreviewProgram.Builder()
 			.setChannelId(ContentUris.parseId(channelUri))
 			.setType(
@@ -657,7 +666,10 @@ class LeanbackChannelWorker(
 			.setDescription(item.availabilityNote ?: item.providerName)
 			.setReleaseDate(item.releaseDate)
 			.setPosterArtUri(ImageProvider.getImageUri(artwork))
-			.setPosterArtAspectRatio(TvContractCompat.PreviewPrograms.ASPECT_RATIO_MOVIE_POSTER)
+			.setPosterArtAspectRatio(
+				if (useWideAspect) TvContractCompat.PreviewPrograms.ASPECT_RATIO_16_9
+				else TvContractCompat.PreviewPrograms.ASPECT_RATIO_MOVIE_POSTER
+			)
 			.setIntent(Intent(context, StartupActivity::class.java).apply {
 				item.localItemId?.let { putExtra(StartupActivity.EXTRA_ITEM_ID, it.toString()) }
 			})
@@ -673,14 +685,21 @@ class LeanbackChannelWorker(
 	 * image when preferred.
 	 */
 	private fun BaseItemDto.getPosterArtImageUrl(
-		preferParentThumb: Boolean
+		preferParentThumb: Boolean,
+		useWideAspect: Boolean = false
 	): Uri {
-		val width = if (type == BaseItemKind.EPISODE) 480 else 320
-		val image = when {
-			type == BaseItemKind.MOVIE || type == BaseItemKind.SERIES -> itemImages[ImageType.PRIMARY]
-			(preferParentThumb || !itemImages.contains(ImageType.PRIMARY)) && parentImages.contains(ImageType.THUMB) -> parentImages[ImageType.THUMB]
-			else -> itemImages[ImageType.PRIMARY]
+		val width = if (type == BaseItemKind.EPISODE || useWideAspect) 480 else 320
+
+		val image = if (useWideAspect) {
+			itemBackdropImages.firstOrNull() ?: itemImages[ImageType.BACKDROP] ?: parentBackdropImages.firstOrNull() ?: itemImages[ImageType.PRIMARY]
+		} else {
+			when {
+				type == BaseItemKind.MOVIE || type == BaseItemKind.SERIES -> itemImages[ImageType.PRIMARY]
+				(preferParentThumb || !itemImages.contains(ImageType.PRIMARY)) && parentImages.contains(ImageType.THUMB) -> parentImages[ImageType.THUMB]
+				else -> itemImages[ImageType.PRIMARY]
+			}
 		}
+
 		val url = image?.getUrl(api, fillWidth = width) ?: imageHelper.getResourceUrl(context, R.drawable.tile_land_tv)
 		return ImageProvider.getImageUri(url)
 	}
@@ -764,9 +783,10 @@ class LeanbackChannelWorker(
 	private fun createPreviewProgram(
 		channelUri: Uri,
 		item: BaseItemDto,
-		preferParentThumb: Boolean
+		preferParentThumb: Boolean,
+		useWideAspect: Boolean = false
 	): ContentValues {
-		val imageUri = item.getPosterArtImageUrl(preferParentThumb)
+		val imageUri = item.getPosterArtImageUrl(preferParentThumb, useWideAspect)
 		val seasonString = item.parentIndexNumber?.toString().orEmpty()
 
 		val episodeString = when {
@@ -797,9 +817,10 @@ class LeanbackChannelWorker(
 			)
 			.setPosterArtUri(imageUri)
 			.setPosterArtAspectRatio(
-				when (item.type) {
-					BaseItemKind.COLLECTION_FOLDER,
-					BaseItemKind.EPISODE -> TvContractCompat.PreviewPrograms.ASPECT_RATIO_16_9
+				when {
+					useWideAspect -> TvContractCompat.PreviewPrograms.ASPECT_RATIO_16_9
+					item.type == BaseItemKind.COLLECTION_FOLDER ||
+					item.type == BaseItemKind.EPISODE -> TvContractCompat.PreviewPrograms.ASPECT_RATIO_16_9
 
 					else -> TvContractCompat.PreviewPrograms.ASPECT_RATIO_MOVIE_POSTER
 				}
