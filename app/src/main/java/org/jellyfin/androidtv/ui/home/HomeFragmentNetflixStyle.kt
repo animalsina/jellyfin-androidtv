@@ -136,9 +136,9 @@ class HomeFragmentNetflixStyle : Fragment() {
 	companion object {
 		private val TRAILER_TYPES =
 			setOf(BaseItemKind.SERIES, BaseItemKind.EPISODE, BaseItemKind.MOVIE, BaseItemKind.SEASON, BaseItemKind.VIDEO)
-		private const val TRAILER_LOOKUP_DELAY_MS = 900L
-		private const val TRAILER_FADE_IN_AFTER_FOCUS_MS = 4_000L
-		private const val TRAILER_MIN_PRELOAD_MS = 3_000L
+		private const val TRAILER_LOOKUP_DELAY_MS = 600L
+		private const val TRAILER_FADE_IN_AFTER_FOCUS_MS = 2_500L
+		private const val TRAILER_MIN_PRELOAD_MS = 1_000L
 		private const val PREVIEW_BACKDROP_LOAD_DELAY_MS = 220L
 		private const val TRAILER_MAX_DURATION_MS = 45_000L
 		private const val TRAILER_FADE_OUT_MS = 250L
@@ -151,7 +151,8 @@ class HomeFragmentNetflixStyle : Fragment() {
 		private const val YOUTUBE_EMBED_BASE_URL = "https://www.youtube-nocookie.com"
 		private val YOUTUBE_SEARCH_ID_PATTERNS = listOf(
 			""""videoId":"([a-zA-Z0-9_-]{11})"""".toRegex(),
-			"""/watch\?v=([a-zA-Z0-9_-]{11})""".toRegex(),
+			"""\\?v=([a-zA-Z0-9_-]{11})""".toRegex(),
+			"""/embed/([a-zA-Z0-9_-]{11})""".toRegex(),
 			"""watchEndpoint":\{"videoId":"([a-zA-Z0-9_-]{11})""".toRegex(),
 		)
 	}

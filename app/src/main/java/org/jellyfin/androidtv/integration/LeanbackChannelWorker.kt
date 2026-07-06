@@ -628,6 +628,9 @@ class LeanbackChannelWorker(
 			.setIntent(Intent(context, StartupActivity::class.java).apply {
 				item.localItemId?.let { putExtra(StartupActivity.EXTRA_ITEM_ID, it.toString()) }
 			})
+			.apply {
+				item.trailerUrl?.let { setPreviewVideoUri(Uri.parse(it)) }
+			}
 			.build()
 			.toContentValues()
 	}
@@ -773,6 +776,10 @@ class LeanbackChannelWorker(
 					setSeasonNumber(seasonString, item.parentIndexNumber!!)
 				if ((item.indexNumber ?: 0) > 0)
 					setEpisodeNumber(episodeString, item.indexNumber!!)
+
+				item.remoteTrailers?.firstOrNull()?.url?.let {
+					setPreviewVideoUri(Uri.parse(it))
+				}
 			}.build().toContentValues()
 	}
 
