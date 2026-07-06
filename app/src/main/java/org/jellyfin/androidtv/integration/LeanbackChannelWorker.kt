@@ -23,6 +23,9 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.await
+import coil3.ImageLoader
+import coil3.request.CachePolicy
+import coil3.request.ImageRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
@@ -124,6 +127,7 @@ class LeanbackChannelWorker(
 	private val userViewsRepository by inject<UserViewsRepository>()
 	private val imageHelper by inject<ImageHelper>()
 	private val externalCatalogRepository by inject<ExternalCatalogRepository>()
+	private val imageLoader by inject<ImageLoader>()
 
 	private data class HomeSectionChannel(
 		val key: String,
@@ -220,6 +224,26 @@ class LeanbackChannelWorker(
 			) else null
 			val preferParentThumb = userPreferences[UserPreferences.seriesThumbnailsEnabled]
 
+			val allItemsToPrefetch = mutableListOf<String>()
+			fun collectForPrefetch(items: List<Any>, limit: Int = 10) {
+				items.take(limit).forEach { item ->
+					when (item) {
+						is BaseItemDto -> {
+							val width = if (item.type == BaseItemKind.EPISODE) 480 else 320
+							val image = when {
+								item.type == BaseItemKind.MOVIE || item.type == BaseItemKind.SERIES -> item.itemImages[ImageType.PRIMARY]
+								(preferParentThumb || !item.itemImages.contains(ImageType.PRIMARY)) && item.parentImages.contains(ImageType.THUMB) -> item.parentImages[ImageType.THUMB]
+								else -> item.itemImages[ImageType.PRIMARY]
+							}
+							image?.getUrl(api, fillWidth = width)?.let { allItemsToPrefetch.add(it) }
+						}
+						is ExternalCatalogItem -> {
+							(item.posterUrl ?: item.backdropUrl)?.let { allItemsToPrefetch.add(it) }
+						}
+					}
+				}
+			}
+
 			// Add new items
 			arrayOf(
 				nextUpItems to nextUpChannel,
@@ -231,6 +255,7 @@ class LeanbackChannelWorker(
 				if (channel == null) {
 					Timber.e("Skipping channel because it was not available")
 				} else {
+					collectForPrefetch(items)
 					items.map { item ->
 						createPreviewProgram(
 							channel,
@@ -255,6 +280,7 @@ class LeanbackChannelWorker(
 						.build()
 				)
 				if (channel != null) {
+					collectForPrefetch(channelData.items)
 					val contentValues = channelData.items.mapNotNull { item ->
 						when (item) {
 							is BaseItemDto -> createPreviewProgram(channel, item, preferParentThumb)
@@ -269,6 +295,7 @@ class LeanbackChannelWorker(
 				}
 			}
 			insertExternalPrograms(externalCatalogChannel, externalCatalogItems)
+			collectForPrefetch(externalCatalogItems)
 			externalCatalogChannels.forEach { channelData ->
 				val channel = getChannelUri(
 					"external_${channelData.key}",
@@ -278,10 +305,16 @@ class LeanbackChannelWorker(
 						.setAppLinkIntent(Intent(context, StartupActivity::class.java))
 						.build()
 				)
+				collectForPrefetch(channelData.items)
 				insertExternalPrograms(channel, channelData.items)
 			}
 			insertExternalPrograms(onlineNewReleasesChannel, onlineNewReleaseItems)
+			collectForPrefetch(onlineNewReleaseItems)
 			updateWatchNext(resumeItems + nextUpItems)
+			collectForPrefetch(resumeItems + nextUpItems)
+
+			// Start prefetching in background
+			prefetchImages(allItemsToPrefetch.distinct())
 
 			// Success!
 			Result.success()
@@ -641,12 +674,26 @@ class LeanbackChannelWorker(
 	 */
 	private fun BaseItemDto.getPosterArtImageUrl(
 		preferParentThumb: Boolean
-	): Uri = when {
-		type == BaseItemKind.MOVIE || type == BaseItemKind.SERIES -> itemImages[ImageType.PRIMARY]
-		(preferParentThumb || !itemImages.contains(ImageType.PRIMARY)) && parentImages.contains(ImageType.THUMB) -> parentImages[ImageType.THUMB]
-		else -> itemImages[ImageType.PRIMARY]
-	}.let { image ->
-		ImageProvider.getImageUri(image?.getUrl(api) ?: imageHelper.getResourceUrl(context, R.drawable.tile_land_tv))
+	): Uri {
+		val width = if (type == BaseItemKind.EPISODE) 480 else 320
+		val image = when {
+			type == BaseItemKind.MOVIE || type == BaseItemKind.SERIES -> itemImages[ImageType.PRIMARY]
+			(preferParentThumb || !itemImages.contains(ImageType.PRIMARY)) && parentImages.contains(ImageType.THUMB) -> parentImages[ImageType.THUMB]
+			else -> itemImages[ImageType.PRIMARY]
+		}
+		val url = image?.getUrl(api, fillWidth = width) ?: imageHelper.getResourceUrl(context, R.drawable.tile_land_tv)
+		return ImageProvider.getImageUri(url)
+	}
+
+	private fun prefetchImages(urls: List<String>) {
+		urls.forEach { url ->
+			val request = ImageRequest.Builder(context)
+				.data(url)
+				.diskCachePolicy(CachePolicy.ENABLED)
+				.memoryCachePolicy(CachePolicy.ENABLED)
+				.build()
+			imageLoader.enqueue(request)
+		}
 	}
 
 	/**

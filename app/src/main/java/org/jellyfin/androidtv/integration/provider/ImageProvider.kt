@@ -66,7 +66,7 @@ class ImageProvider : ContentProvider() {
 		@Suppress("DEPRECATION")
 		val format = when {
 			AndroidVersion.isAtLeastR -> Bitmap.CompressFormat.WEBP_LOSSY
-			else -> Bitmap.CompressFormat.WEBP
+			else -> Bitmap.CompressFormat.JPEG
 		}
 
 		try {
@@ -79,7 +79,7 @@ class ImageProvider : ContentProvider() {
 	}
 
 	companion object {
-		private const val COMPRESSION_QUALITY = 95
+		private const val COMPRESSION_QUALITY = 80
 
 		/**
 		 * Restituisce un [Uri] che usa l'[ImageProvider] per caricare un’immagine.
