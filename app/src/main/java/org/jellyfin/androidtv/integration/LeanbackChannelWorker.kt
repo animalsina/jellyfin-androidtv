@@ -27,6 +27,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
 import org.jellyfin.androidtv.R
+import org.jellyfin.androidtv.data.model.ExternalCatalogItem
+import org.jellyfin.androidtv.data.repository.ExternalCatalogRepository
 import org.jellyfin.androidtv.data.repository.ItemRepository
 import org.jellyfin.androidtv.data.repository.UserViewsRepository
 import org.jellyfin.androidtv.integration.provider.ImageProvider
@@ -88,6 +90,7 @@ class LeanbackChannelWorker(
 	private val userPreferences by inject<UserPreferences>()
 	private val userViewsRepository by inject<UserViewsRepository>()
 	private val imageHelper by inject<ImageHelper>()
+	private val externalCatalogRepository by inject<ExternalCatalogRepository>()
 
 	/**
 	 * Check if the app can use Leanback features and is API level 26 or higher.
@@ -112,6 +115,8 @@ class LeanbackChannelWorker(
 			// Get latest media
 			val (latestEpisodes, latestMovies, latestMedia) = getLatestMedia()
 			val myMedia = getMyMedia()
+			val externalCatalogItems = getExternalCatalogItems()
+			val onlineNewReleaseItems = getOnlineNewReleaseItems()
 			// Delete current items from the channels
 			context.contentResolver.delete(TvContractCompat.PreviewPrograms.CONTENT_URI, null, null)
 
@@ -152,6 +157,20 @@ class LeanbackChannelWorker(
 					.setAppLinkIntent(Intent(context, StartupActivity::class.java))
 					.build()
 			)
+			val externalCatalogChannel = if (externalCatalogItems.isNotEmpty()) getChannelUri(
+				"external_catalog", Channel.Builder()
+					.setType(TvContractCompat.Channels.TYPE_PREVIEW)
+					.setDisplayName(context.getString(R.string.home_section_external_catalog))
+					.setAppLinkIntent(Intent(context, StartupActivity::class.java))
+					.build()
+			) else null
+			val onlineNewReleasesChannel = if (onlineNewReleaseItems.isNotEmpty()) getChannelUri(
+				"online_new_releases", Channel.Builder()
+					.setType(TvContractCompat.Channels.TYPE_PREVIEW)
+					.setDisplayName(context.getString(R.string.home_section_online_new_releases))
+					.setAppLinkIntent(Intent(context, StartupActivity::class.java))
+					.build()
+			) else null
 			val preferParentThumb = userPreferences[UserPreferences.seriesThumbnailsEnabled]
 
 			// Add new items
@@ -179,6 +198,8 @@ class LeanbackChannelWorker(
 					}
 				}
 			}
+			insertExternalPrograms(externalCatalogChannel, externalCatalogItems)
+			insertExternalPrograms(onlineNewReleasesChannel, onlineNewReleaseItems)
 			updateWatchNext(resumeItems + nextUpItems)
 
 			// Success!
@@ -254,6 +275,51 @@ class LeanbackChannelWorker(
 		// Add new items
 		return response.items
 			.filter { userViewsRepository.isSupported(it.collectionType) }
+	}
+
+	private suspend fun getExternalCatalogItems(): List<ExternalCatalogItem> = withContext(Dispatchers.IO) {
+		runCatching { externalCatalogRepository.loadHomeCatalog(limit = 20) }
+			.onFailure { Timber.w(it, "Unable to populate external catalog Android TV channel") }
+			.getOrDefault(emptyList())
+	}
+
+	private suspend fun getOnlineNewReleaseItems(): List<ExternalCatalogItem> = withContext(Dispatchers.IO) {
+		runCatching { externalCatalogRepository.loadNewReleases(limit = 20) }
+			.onFailure { Timber.w(it, "Unable to populate online new releases Android TV channel") }
+			.getOrDefault(emptyList())
+	}
+
+	@SuppressLint("RestrictedApi")
+	private fun insertExternalPrograms(channelUri: Uri?, items: List<ExternalCatalogItem>) {
+		if (channelUri == null || items.isEmpty()) return
+		context.contentResolver.bulkInsert(
+			TvContractCompat.PreviewPrograms.CONTENT_URI,
+			items.map { createExternalPreviewProgram(channelUri, it) }.toTypedArray()
+		)
+	}
+
+	@SuppressLint("RestrictedApi")
+	private fun createExternalPreviewProgram(channelUri: Uri, item: ExternalCatalogItem): ContentValues {
+		val artwork = item.posterUrl ?: item.backdropUrl ?: imageHelper.getResourceUrl(context, R.drawable.tile_land_tv)
+		return PreviewProgram.Builder()
+			.setChannelId(ContentUris.parseId(channelUri))
+			.setType(
+				when (item.type) {
+					BaseItemKind.SERIES -> WatchNextPrograms.TYPE_TV_SERIES
+					BaseItemKind.EPISODE -> WatchNextPrograms.TYPE_TV_EPISODE
+					else -> WatchNextPrograms.TYPE_MOVIE
+				}
+			)
+			.setTitle(item.title)
+			.setDescription(item.availabilityNote ?: item.providerName)
+			.setReleaseDate(item.releaseDate)
+			.setPosterArtUri(ImageProvider.getImageUri(artwork))
+			.setPosterArtAspectRatio(TvContractCompat.PreviewPrograms.ASPECT_RATIO_MOVIE_POSTER)
+			.setIntent(Intent(context, StartupActivity::class.java).apply {
+				item.localItemId?.let { putExtra(StartupActivity.EXTRA_ITEM_ID, it.toString()) }
+			})
+			.build()
+			.toContentValues()
 	}
 
 	/**

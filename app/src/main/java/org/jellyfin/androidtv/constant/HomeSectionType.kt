@@ -34,5 +34,6 @@ enum class HomeSectionType(
 	MOOD_ACTION("moodaction", R.string.home_section_mood_action),
 	MOOD_SHORT("moodshort", R.string.home_section_mood_short),
 	EXTERNAL_PROVIDERS("externalproviders", R.string.home_section_external_providers),
+	ONLINE_NEW_RELEASES("onlinenewreleases", R.string.home_section_online_new_releases),
 	NONE("none", R.string.home_section_none),
 }

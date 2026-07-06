@@ -43,6 +43,11 @@
         <package android:name="com.amazon.amazonvideo.livingroom" />
         <package android:name="com.amazon.avod.thirdpartyclient" />
         <package android:name="com.netflix.ninja" />
+        <package android:name="com.google.android.youtube.tv" />
+        <package android:name="com.google.android.youtube" />
+        <package android:name="com.liskovsoft.smarttubetv" />
+        <package android:name="com.liskovsoft.smarttubetv.beta" />
+        <package android:name="com.teamsmart.videomanager.tv" />
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data
@@ -122,6 +127,21 @@
                 android:resource="@xml/apk_update_file_paths" />
         </provider>
 
+        <!-- Update Bootstrap -->
+        <activity
+            android:name=".ui.startup.UpdateBootstrapActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:noHistory="true"
+            android:theme="@style/Theme.Jellyfin"
+            android:windowSoftInputMode="adjustNothing">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+        </activity>
+
         <!-- Authentication -->
         <activity
             android:name=".ui.startup.StartupActivity"
@@ -130,12 +150,8 @@
             android:noHistory="true"
             android:windowSoftInputMode="adjustNothing">
             <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
                 <action android:name="android.intent.action.SEARCH" />
                 <action android:name="android.intent.action.VIEW" />
-
-                <category android:name="android.intent.category.LAUNCHER" />
-                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
 
             <meta-data
@@ -153,5 +169,17 @@
             android:windowSoftInputMode="adjustNothing" />
 
         <activity android:name=".ui.playback.ExternalPlayerActivity" />
+
+        <activity
+            android:name=".ui.playback.ExternalStreamPlayerActivity"
+            android:launchMode="singleTask"
+            android:screenOrientation="landscape"
+            android:theme="@style/Theme.Jellyfin" />
+
+        <activity
+            android:name=".ui.playback.TrailerWebViewActivity"
+            android:launchMode="singleTask"
+            android:screenOrientation="landscape"
+            android:theme="@style/Theme.Jellyfin" />
     </application>
 </manifest>

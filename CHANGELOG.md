@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.0.19 - 2026-07-06
+
+- I trailer in home partono in modo più affidabile dopo focus stabile: prima vengono usati i trailer già presenti nei metadati Jellyfin, poi una ricerca YouTube più tollerante e cancellabile al cambio elemento.
+- Il pulsante “Riproduci trailer” nella scheda dettaglio usa un layer WebView interno a SuperJelly e passa a SmartTube/YouTube solo come fallback.
+- Le schede dei cataloghi streaming ora aprono un menu smart: riproduzione interna dei flussi liberi, ricerca nel server, apertura della scheda locale se il contenuto è già presente, oppure apertura provider.
+- Aggiunta la riga “Nuove uscite online”, popolata da una sorgente online e riallineata alla libreria locale dopo gli aggiornamenti/scansioni, così un titolo già posseduto viene marcato come disponibile sul server.
+- Le righe SuperJelly esterne e le nuove uscite vengono pubblicate anche come canali Android TV/Projectivy quando hanno contenuti disponibili.
+- Le righe della home hanno più respiro verticale e la navigazione riduce micro-lag caricando copertine e trailer con debounce più conservativi.
+- Il controllo update iniziale resta prima della home: se trova una nuova APK non prosegue automaticamente finché non scegli di aggiornare o ignorare.
+
 ## v1.0.15 - 2026-07-06
 
 - Verificata la migrazione sul fork aggiornato: le personalizzazioni principali di SuperJelly risultano ancora presenti e la cronologia patch viene ricreata per questo pacchetto.
@@ -52,6 +62,16 @@
 - Mantenuto invariato il comportamento Android TV/D-pad.
 
 # Changelog
+
+## v1.0.19 - 2026-07-06
+
+- I trailer in home partono in modo più affidabile dopo focus stabile: prima vengono usati i trailer già presenti nei metadati Jellyfin, poi una ricerca YouTube più tollerante e cancellabile al cambio elemento.
+- Il pulsante “Riproduci trailer” nella scheda dettaglio usa un layer WebView interno a SuperJelly e passa a SmartTube/YouTube solo come fallback.
+- Le schede dei cataloghi streaming ora aprono un menu smart: riproduzione interna dei flussi liberi, ricerca nel server, apertura della scheda locale se il contenuto è già presente, oppure apertura provider.
+- Aggiunta la riga “Nuove uscite online”, popolata da una sorgente online e riallineata alla libreria locale dopo gli aggiornamenti/scansioni, così un titolo già posseduto viene marcato come disponibile sul server.
+- Le righe SuperJelly esterne e le nuove uscite vengono pubblicate anche come canali Android TV/Projectivy quando hanno contenuti disponibili.
+- Le righe della home hanno più respiro verticale e la navigazione riduce micro-lag caricando copertine e trailer con debounce più conservativi.
+- Il controllo update iniziale resta prima della home: se trova una nuova APK non prosegue automaticamente finché non scegli di aggiornare o ignorare.
 
 ## v1.0.8 - Mobile touch row selection build fix
 

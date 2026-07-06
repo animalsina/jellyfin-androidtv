@@ -220,6 +220,15 @@
     <string name="lbl_streaming_search_free_sources">Search free/included sources online</string>
     <string name="lbl_streaming_search_on_provider">Search on %1$s</string>
     <string name="msg_streaming_no_installed_provider">No supported streaming app is installed on this device.</string>
+
+    <string name="home_section_online_new_releases">New online releases</string>
+    <string name="lbl_external_catalog_new_release_group">Release calendar</string>
+    <string name="lbl_external_catalog_available_on_server">Available on your server</string>
+    <string name="lbl_external_catalog_release_date">Release: %1$s</string>
+    <string name="lbl_external_catalog_open_local">Open from my server</string>
+    <string name="lbl_external_catalog_play_here">Play here in SuperJelly</string>
+    <string name="lbl_external_catalog_open_provider">Open on %1$s</string>
+    <string name="lbl_external_catalog_search_server">Search in my server</string>
     <string name="msg_external_catalog_unavailable">Unable to open this external catalog item.</string>
     <string name="lbl_show_backdrop">Show backdrops</string>
     <string name="lbl_show_premieres">Show season premieres</string>

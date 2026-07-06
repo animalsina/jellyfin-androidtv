@@ -9,6 +9,8 @@ import org.jellyfin.androidtv.constant.ChangeTriggerType
 import org.jellyfin.androidtv.data.repository.ExternalCatalogRepository
 import org.jellyfin.androidtv.data.repository.ItemRepository
 import org.jellyfin.androidtv.ui.browsing.BrowseRowDef
+import org.jellyfin.sdk.api.client.ApiClient
+import org.jellyfin.sdk.api.client.extensions.itemsApi
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.MediaType
@@ -16,11 +18,13 @@ import org.jellyfin.sdk.model.api.request.GetNextUpRequest
 import org.jellyfin.sdk.model.api.request.GetRecommendedProgramsRequest
 import org.jellyfin.sdk.model.api.request.GetRecordingsRequest
 import org.jellyfin.sdk.model.api.request.GetResumeItemsRequest
+import org.jellyfin.sdk.model.api.request.GetItemsRequest
 
 class HomeFragmentHelper(
 	private val context: Context,
 	private val userRepository: UserRepository,
 	private val externalCatalogRepository: ExternalCatalogRepository,
+	private val api: ApiClient,
 ) {
 	suspend fun loadRecentlyAdded(userViews: Collection<BaseItemDto>): HomeFragmentRow =
 		withContext(Dispatchers.IO) {
@@ -165,6 +169,33 @@ class HomeFragmentHelper(
 		HomeFragmentExternalProvidersRow(externalCatalogRepository.loadHomeCatalog())
 	}
 
+	suspend fun loadOnlineNewReleases(): HomeFragmentRow = withContext(Dispatchers.IO) {
+		HomeFragmentOnlineNewReleasesRow(
+			externalCatalogRepository.loadNewReleases(
+				localMatches = loadLocalTitleMatches(),
+			)
+		)
+	}
+
+	private suspend fun loadLocalTitleMatches(): Map<String, java.util.UUID> = withContext(Dispatchers.IO) {
+		runCatching {
+			val result = api.itemsApi.getItems(
+				GetItemsRequest(
+					fields = ItemRepository.itemFields,
+					includeItemTypes = listOf(BaseItemKind.MOVIE, BaseItemKind.SERIES),
+					recursive = true,
+					enableTotalRecordCount = false,
+					imageTypeLimit = 1,
+					limit = ITEM_LIMIT_LOCAL_MATCHES,
+				)
+			).content
+
+			result.items.orEmpty()
+				.filter { !it.name.isNullOrBlank() }
+				.associate { org.jellyfin.androidtv.data.repository.ExternalCatalogRepository.normalizeTitle(it.name.orEmpty()) to it.id }
+		}.getOrDefault(emptyMap())
+	}
+
 
 	companion object {
 		// Maximum amount of items loaded for a row
@@ -172,5 +203,6 @@ class HomeFragmentHelper(
 		private const val ITEM_LIMIT_RECORDINGS = 15
 		private const val ITEM_LIMIT_NEXT_UP = 15
 		private const val ITEM_LIMIT_ON_NOW = 15
+		private const val ITEM_LIMIT_LOCAL_MATCHES = 1200
 	}
 }

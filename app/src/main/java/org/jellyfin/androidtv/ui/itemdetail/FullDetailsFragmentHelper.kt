@@ -1,6 +1,7 @@
 package org.jellyfin.androidtv.ui.itemdetail
 
 import android.content.ActivityNotFoundException
+import android.content.Intent
 import android.view.View
 import android.widget.Toast
 import androidx.core.view.isVisible
@@ -14,6 +15,8 @@ import org.jellyfin.androidtv.data.repository.ItemMutationRepository
 import org.jellyfin.androidtv.data.repository.ItemRepository
 import org.jellyfin.androidtv.ui.navigation.Destinations
 import org.jellyfin.androidtv.ui.navigation.NavigationRepository
+import org.jellyfin.androidtv.ui.playback.TrailerWebViewActivity
+import org.jellyfin.androidtv.streaming.StreamingAvailabilityHelper
 import org.jellyfin.androidtv.util.TimeUtils
 import org.jellyfin.androidtv.util.apiclient.getSeriesOverview
 import org.jellyfin.androidtv.util.popupMenu
@@ -87,6 +90,12 @@ fun FullDetailsFragment.showDetailsMenu(
 		item(getString(R.string.lbl_play_trailers)) { playTrailers() }
 	}
 
+	if (streamingAvailabilityButton?.isVisible == false) {
+		item(getString(R.string.lbl_streaming_availability)) {
+			StreamingAvailabilityHelper.openAvailabilityMenu(requireContext(), mBaseItem)
+		}
+	}
+
 	if (favButton?.isVisible == false) {
 		val favoriteStringRes = when (baseItemDto.userData?.isFavorite) {
 			true -> R.string.lbl_remove_favorite
@@ -157,10 +166,18 @@ fun FullDetailsFragment.togglePlayed() {
 fun FullDetailsFragment.playTrailers() {
 	val localTrailerCount = mBaseItem.localTrailerCount ?: 0
 
-	// External trailer
+	// External trailer: keep the user inside SuperJelly with an embedded layer first.
 	if (localTrailerCount < 1) try {
 		val intent = getExternalTrailerIntent(requireContext(), mBaseItem)
-		if (intent != null) startActivity(intent)
+		val trailerUrl = intent?.dataString
+		if (!trailerUrl.isNullOrBlank()) {
+			startActivity(
+				Intent(requireContext(), TrailerWebViewActivity::class.java)
+					.putExtra(TrailerWebViewActivity.EXTRA_URL, trailerUrl)
+			)
+		} else if (intent != null) {
+			startActivity(intent)
+		}
 	} catch (exception: ActivityNotFoundException) {
 		Timber.w(exception, "Unable to open external trailer")
 		Toast.makeText(

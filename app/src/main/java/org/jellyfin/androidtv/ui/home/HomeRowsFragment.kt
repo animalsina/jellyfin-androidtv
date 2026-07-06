@@ -90,7 +90,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	private val keyProcessor by inject<KeyProcessor>()
 	private val homePreviewViewModel: HomePreviewViewModel by activityViewModel()
 
-	private val helper by lazy { HomeFragmentHelper(requireContext(), userRepository, externalCatalogRepository) }
+	private val helper by lazy { HomeFragmentHelper(requireContext(), userRepository, externalCatalogRepository, api) }
 	private val useTouchHomeNavigation by lazy { TouchNavigationHelper.shouldUseTouchHomeNavigation(requireContext()) }
 	private var touchHomeDownX = 0f
 	private var touchHomeDownY = 0f
@@ -128,7 +128,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	private fun scheduleSelectedPreview(item: BaseRowItem) {
 		selectedPreviewJob?.cancel()
 		selectedPreviewJob = lifecycleScope.launch {
-			delay(160)
+			delay(240)
 			if (currentItem !== item) return@launch
 			backgroundService.setBackground(item.baseItem)
 			homePreviewViewModel.updateSelectedItem(item)
@@ -177,7 +177,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 					Timber.e(e, "WebSocket subscription failed")
 				}
 
-				api.webSocket.subscribe<LibraryChangedMessage>().onEach { refreshRows(force = true, delayed = false) }.launchIn(this)
+				api.webSocket.subscribe<LibraryChangedMessage>().onEach { buildHomeRows(forceUpdateSettings = false) }.launchIn(this)
 			}
 		}
 
@@ -202,7 +202,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 			preserveFocusAfterLayout = false
 			isNestedScrollingEnabled = true
 			isVerticalScrollBarEnabled = true
-			setItemViewCacheSize(12)
+			setItemViewCacheSize(20)
 			setOnTouchListener(null)
 			clearFocus()
 		}
@@ -342,84 +342,90 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	private fun buildHomeRows(forceUpdateSettings: Boolean = false) {
 		buildRowsJob?.cancel()
 		buildRowsJob = lifecycleScope.launch {
-			val currentUser = withTimeout(30.seconds) {
-				userRepository.currentUser.filterNotNull().first()
-			}
+			try {
+				val currentUser = withTimeout(30.seconds) {
+					userRepository.currentUser.filterNotNull().first()
+				}
 
-			if (forceUpdateSettings || userSettingPreferences.shouldUpdate) userSettingPreferences.update()
-			val homeSections = userSettingPreferences.activeHomesections
-			loadedHomeSections = homeSections
-			val userViews = userViewsRepository.views.first()
-			var includeLiveTvRows = false
+				if (forceUpdateSettings || userSettingPreferences.shouldUpdate) userSettingPreferences.update()
+				val homeSections = userSettingPreferences.activeHomesections
+				loadedHomeSections = homeSections
+				val userViews = userViewsRepository.views.first()
+				var includeLiveTvRows = false
 
-			if (homeSections.contains(HomeSectionType.LIVE_TV) && currentUser.policy?.enableLiveTvAccess == true) {
-				includeLiveTvRows = withTimeoutOrNull(5.seconds) {
-					try {
-						val recommendedPrograms = api.liveTvApi.getRecommendedPrograms(
-							enableTotalRecordCount = false,
-							imageTypeLimit = 1,
-							isAiring = true,
-							limit = 1,
-						).content
-						recommendedPrograms.items.isNotEmpty()
-					} catch (e: Exception) {
-						Timber.w(e, "Live TV probe failed; skipping live rows for this home load")
-						false
-					}
-				} ?: false
-			}
+				if (homeSections.contains(HomeSectionType.LIVE_TV) && currentUser.policy?.enableLiveTvAccess == true) {
+					includeLiveTvRows = withTimeoutOrNull(5.seconds) {
+						try {
+							val recommendedPrograms = api.liveTvApi.getRecommendedPrograms(
+								enableTotalRecordCount = false,
+								imageTypeLimit = 1,
+								isAiring = true,
+								limit = 1,
+							).content
+							recommendedPrograms.items.isNotEmpty()
+						} catch (e: Exception) {
+							Timber.w(e, "Live TV probe failed; skipping live rows for this home load")
+							false
+						}
+					} ?: false
+				}
 
-			val rowsAdapter = adapter as MutableObjectAdapter<Row>
-			val cardPresenter = CardPresenter(true, org.jellyfin.androidtv.constant.ImageType.POSTER, 120)
-			val ctx = requireContext()
-			val recyclerView = verticalGridView
-			var initialPreviewSet = false
+				val rowsAdapter = adapter as MutableObjectAdapter<Row>
+				val cardPresenter = CardPresenter(true, org.jellyfin.androidtv.constant.ImageType.POSTER, 120)
+				val ctx = context ?: return@launch
+				val recyclerView = verticalGridView
+				var initialPreviewSet = false
 
-			withContext(Dispatchers.Main) {
-				recyclerView?.suppressLayout(true)
-				rowsAdapter.clear()
-				recyclerView?.suppressLayout(false)
-			}
-
-			suspend fun appendRow(row: HomeFragmentRow?) {
-				if (row == null) return
 				withContext(Dispatchers.Main) {
-					val touchScrollAnchor = captureTouchScrollAnchor(recyclerView)
-					val rowCountBefore = rowsAdapter.size()
-					row.addToRowsAdapter(ctx, cardPresenter, rowsAdapter)
-					if (rowsAdapter.size() == rowCountBefore) return@withContext
-					recyclerView?.post { restoreTouchScrollAnchor(recyclerView, touchScrollAnchor) }
-					if (!initialPreviewSet) {
-						initialPreviewSet = true
-						recyclerView?.post {
-							val firstRow = rowsAdapter.firstOrNull() as? ListRow
-							val adapterFirstRow = firstRow?.adapter as? ItemRowAdapter
-							val firstItem = adapterFirstRow?.get(0) as? BaseRowItem
-							if (firstItem != null) {
-								backgroundService.setBackground(firstItem.baseItem)
-								homePreviewViewModel.updateSelectedItem(firstItem)
+					recyclerView?.suppressLayout(true)
+					rowsAdapter.clear()
+					recyclerView?.suppressLayout(false)
+				}
+
+				suspend fun appendRow(row: HomeFragmentRow?) {
+					if (row == null || !isAdded) return
+					withContext(Dispatchers.Main) {
+						val touchScrollAnchor = captureTouchScrollAnchor(recyclerView)
+						val rowCountBefore = rowsAdapter.size()
+						row.addToRowsAdapter(ctx, cardPresenter, rowsAdapter)
+						if (rowsAdapter.size() == rowCountBefore) return@withContext
+						recyclerView?.post { restoreTouchScrollAnchor(recyclerView, touchScrollAnchor) }
+						if (!initialPreviewSet) {
+							initialPreviewSet = true
+							recyclerView?.post {
+								val firstRow = rowsAdapter.firstOrNull() as? ListRow
+								val adapterFirstRow = firstRow?.adapter as? ItemRowAdapter
+								val firstItem = adapterFirstRow?.get(0) as? BaseRowItem
+								if (firstItem != null && isAdded) {
+									backgroundService.setBackground(firstItem.baseItem)
+									homePreviewViewModel.updateSelectedItem(firstItem)
+								}
 							}
 						}
 					}
 				}
-			}
 
-			val prioritySections = homeSections.filter(::isPriorityHomeSection)
-			val deferredSections = homeSections.filterNot(::isPriorityHomeSection)
+				val prioritySections = homeSections.filter(::isPriorityHomeSection)
+				val deferredSections = homeSections.filterNot(::isPriorityHomeSection)
 
-			for (section in prioritySections) {
-				appendRow(withContext(Dispatchers.IO) { loadRowForSection(section, includeLiveTvRows, userViews) })
-				delay(120)
-			}
+				for (section in prioritySections) {
+					if (!isAdded) break
+					appendRow(withContext(Dispatchers.IO) { loadRowForSection(section, includeLiveTvRows, userViews) })
+					delay(80)
+				}
 
-			for (section in deferredSections) {
-				appendRow(withContext(Dispatchers.IO) { loadRowForSection(section, includeLiveTvRows, userViews) })
-				delay(180)
-			}
+				for (section in deferredSections) {
+					if (!isAdded) break
+					appendRow(withContext(Dispatchers.IO) { loadRowForSection(section, includeLiveTvRows, userViews) })
+					delay(110)
+				}
 
-			if (includeLiveTvRows) {
-				val onNowRow = withContext(Dispatchers.IO) { helper.loadOnNow() }
-				appendRow(onNowRow)
+				if (includeLiveTvRows && isAdded) {
+					val onNowRow = withContext(Dispatchers.IO) { helper.loadOnNow() }
+					appendRow(onNowRow)
+				}
+			} catch (e: Exception) {
+				Timber.e(e, "Error building home rows")
 			}
 		}
 	}
@@ -459,6 +465,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 			HomeSectionType.MOOD_ACTION -> helper.loadMoodAction(userViews)
 			HomeSectionType.MOOD_SHORT -> helper.loadMoodShort(userViews)
 			HomeSectionType.EXTERNAL_PROVIDERS -> helper.loadExternalProviders()
+			HomeSectionType.ONLINE_NEW_RELEASES -> helper.loadOnlineNewReleases()
 			else -> null
 		}
 	}

@@ -41,6 +41,7 @@ import org.jellyfin.androidtv.data.repository.UserViewsRepository
 import org.jellyfin.androidtv.preference.UserPreferences
 import org.jellyfin.androidtv.ui.AsyncImageView
 import org.jellyfin.androidtv.ui.itemhandling.BaseRowItem
+import org.jellyfin.androidtv.ui.itemhandling.ExternalCatalogBaseRowItem
 import org.jellyfin.androidtv.ui.itemhandling.ItemLauncher
 import org.jellyfin.androidtv.ui.navigation.ActivityDestinations
 import org.jellyfin.androidtv.ui.navigation.Destinations
@@ -121,16 +122,21 @@ class HomeFragmentNetflixStyle : Fragment() {
 	companion object {
 		private val TRAILER_TYPES =
 			setOf(BaseItemKind.SERIES, BaseItemKind.EPISODE, BaseItemKind.MOVIE, BaseItemKind.SEASON, BaseItemKind.VIDEO)
-		private const val TRAILER_START_DELAY_MS = 2_800L
-		private const val PREVIEW_BACKDROP_LOAD_DELAY_MS = 160L
+		private const val TRAILER_START_DELAY_MS = 1_900L
+		private const val PREVIEW_BACKDROP_LOAD_DELAY_MS = 220L
 		private const val TRAILER_MAX_DURATION_MS = 45_000L
 		private const val TRAILER_FADE_OUT_MS = 250L
-		private const val TRAILER_NETWORK_TIMEOUT_MS = 4_000L
-		private const val TRAILER_ERROR_BACKOFF_MS = 120_000L
-		private const val TRAILER_MAX_CONSECUTIVE_FAILURES = 3
+		private const val TRAILER_NETWORK_TIMEOUT_MS = 6_500L
+		private const val TRAILER_ERROR_BACKOFF_MS = 60_000L
+		private const val TRAILER_MAX_CONSECUTIVE_FAILURES = 5
 		private const val MAX_TRAILER_CACHE_ITEMS = 80
 		private const val MAX_TRAILER_MISS_CACHE_ITEMS = 120
 		private val YOUTUBE_ID_REGEX = """(?:v=|/embed/|youtu\.be/|/shorts/)([a-zA-Z0-9_-]{11})""".toRegex()
+		private val YOUTUBE_SEARCH_ID_PATTERNS = listOf(
+			"""\"videoId\":\"([a-zA-Z0-9_-]{11})\""".toRegex(),
+			"""/watch\?v=([a-zA-Z0-9_-]{11})""".toRegex(),
+			"""watchEndpoint":\{"videoId":"([a-zA-Z0-9_-]{11})""".toRegex(),
+		)
 	}
 
 	override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
@@ -165,6 +171,7 @@ class HomeFragmentNetflixStyle : Fragment() {
 			settings.javaScriptEnabled = true
 			settings.loadsImagesAutomatically = true
 			settings.setSupportMultipleWindows(false)
+			settings.userAgentString = "Mozilla/5.0 (SMART-TV; Linux; Tizen 6.0) AppleWebKit/537.36 SuperJellyTV"
 			setBackgroundColor(android.graphics.Color.TRANSPARENT)
 		}
 
@@ -285,8 +292,15 @@ class HomeFragmentNetflixStyle : Fragment() {
 		updateMetadata(baseItem)
 		previewPoster.visibility = View.GONE
 
-		if (isTrailerEnabled() && item !is org.jellyfin.androidtv.ui.itemhandling.ExternalCatalogBaseRowItem && TRAILER_TYPES.contains(baseItem.type) && !isTrailerBackoffActive()) {
-			playYouTubeTrailerWithDelay(item, nextItemId)
+		val externalTrailerId = (item as? ExternalCatalogBaseRowItem)?.catalogItem?.trailerUrl?.let(::extractYouTubeVideoId)
+		if (isTrailerEnabled() && TRAILER_TYPES.contains(baseItem.type) && !isTrailerBackoffActive()) {
+			when {
+				!externalTrailerId.isNullOrBlank() -> {
+					trailerCache.put(nextItemId, externalTrailerId)
+					playYouTubeTrailerWithDelay(item, nextItemId)
+				}
+				item !is ExternalCatalogBaseRowItem -> playYouTubeTrailerWithDelay(item, nextItemId)
+			}
 		}
 	}
 
@@ -313,20 +327,21 @@ class HomeFragmentNetflixStyle : Fragment() {
 	}
 
 	private fun updateMetadata(item: BaseItemDto) {
+		val context = context ?: return
 		// Content type
 		when (item.type) {
 			BaseItemKind.MOVIE -> {
-				previewContentType.text = requireContext().getString(R.string.lbl_movie)
+				previewContentType.text = context.getString(R.string.lbl_movie)
 				previewContentType.visibility = View.VISIBLE
 			}
 
 			BaseItemKind.SERIES -> {
-				previewContentType.text = requireContext().getString(R.string.lbl_series)
+				previewContentType.text = context.getString(R.string.lbl_series)
 				previewContentType.visibility = View.VISIBLE
 			}
 
 			BaseItemKind.EPISODE -> {
-				previewContentType.text = requireContext().getString(R.string.lbl_episode)
+				previewContentType.text = context.getString(R.string.lbl_episode)
 				previewContentType.visibility = View.VISIBLE
 			}
 
@@ -425,10 +440,11 @@ class HomeFragmentNetflixStyle : Fragment() {
 		lifecycleScope.launch {
 			try {
 				val userViews = userViewsRepository.views.first()
-				val navContainer = view.findViewById<ViewGroup>(R.id.nav_pills_container)
+				if (!isAdded) return@launch
+				val navContainer = view.findViewById<ViewGroup>(R.id.nav_pills_container) ?: return@launch
 
 				// Clear existing dynamic tabs (keep only static ones)
-				navContainer?.removeAllViews()
+				navContainer.removeAllViews()
 
 				// Create tabs based on available libraries
 				var previousButtonId: Int? = null
@@ -436,7 +452,7 @@ class HomeFragmentNetflixStyle : Fragment() {
 				for (userView in userViews) {
 					val tabButton = createNavTab(userView)
 					if (tabButton != null) {
-						navContainer?.addView(tabButton)
+						navContainer.addView(tabButton)
 
 						// Set up focus navigation
 						if (previousButtonId != null) {
@@ -453,34 +469,37 @@ class HomeFragmentNetflixStyle : Fragment() {
 
 				// Add Jellyfin tab (always present)
 				val jellyfinTab = createJellyfinTab()
-				navContainer?.addView(jellyfinTab)
+				if (jellyfinTab != null) {
+					navContainer.addView(jellyfinTab)
 
-				// Set up focus navigation for Jellyfin tab
-				if (previousButtonId != null) {
-					jellyfinTab.nextFocusLeftId = previousButtonId
-					view.findViewById<View>(previousButtonId)?.nextFocusRightId = jellyfinTab.id
-				} else {
-					// If no libraries, connect search directly to Jellyfin
-					view.findViewById<View>(R.id.toolbar_search)?.nextFocusRightId = jellyfinTab.id
+					// Set up focus navigation for Jellyfin tab
+					if (previousButtonId != null) {
+						jellyfinTab.nextFocusLeftId = previousButtonId
+						view.findViewById<View>(previousButtonId)?.nextFocusRightId = jellyfinTab.id
+					} else {
+						// If no libraries, connect search directly to Jellyfin
+						view.findViewById<View>(R.id.toolbar_search)?.nextFocusRightId = jellyfinTab.id
+					}
+
+					// Connect last tab to user avatar
+					jellyfinTab.nextFocusRightId = R.id.toolbar_user_avatar
+					view.findViewById<View>(R.id.toolbar_user_avatar)?.nextFocusLeftId = jellyfinTab.id
 				}
-
-				// Connect last tab to user avatar
-				jellyfinTab.nextFocusRightId = R.id.toolbar_user_avatar
-				view.findViewById<View>(R.id.toolbar_user_avatar)?.nextFocusLeftId = jellyfinTab.id
 
 			} catch (e: Exception) {
 				Timber.e(e, "Failed to set up dynamic navigation tabs")
 				// Fallback to static tabs if dynamic setup fails
-				setupStaticNavigationTabs(view)
+				if (isAdded) setupStaticNavigationTabs(view)
 			}
 		}
 	}
 
 	private fun createNavTab(userView: BaseItemDto): TextView? {
+		val context = context ?: return null
 		val displayName = getDisplayNameForCollectionType(userView.collectionType, userView.name)
 		if (displayName == null) return null
 
-		return TextView(requireContext()).apply {
+		return TextView(context).apply {
 			id = View.generateViewId()
 			layoutParams = ViewGroup.MarginLayoutParams(
 				ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -513,8 +532,9 @@ class HomeFragmentNetflixStyle : Fragment() {
 		}
 	}
 
-	private fun createJellyfinTab(): TextView {
-		return TextView(requireContext()).apply {
+	private fun createJellyfinTab(): TextView? {
+		val context = context ?: return null
+		return TextView(context).apply {
 			id = View.generateViewId()
 			layoutParams = ViewGroup.MarginLayoutParams(
 				ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -548,7 +568,7 @@ class HomeFragmentNetflixStyle : Fragment() {
 	}
 
 	private fun getDisplayNameForCollectionType(collectionType: CollectionType?, fallbackName: String?): String? {
-		val ctx = requireContext()
+		val ctx = context ?: return fallbackName
 		return when (collectionType) {
 			CollectionType.MOVIES -> ctx.getString(R.string.lbl_movies)
 			CollectionType.TVSHOWS -> ctx.getString(R.string.lbl_tv_show)
@@ -576,36 +596,39 @@ class HomeFragmentNetflixStyle : Fragment() {
 
 	private fun setupStaticNavigationTabs(view: View) {
 		// Fallback implementation: create basic tabs when dynamic setup fails
+		val context = context ?: return
 		val navContainer = view.findViewById<ViewGroup>(R.id.nav_pills_container)
-		val ctx = requireContext()
 
 		// Create static tabs as fallback
-		val moviesTab = createStaticTab(ctx.getString(R.string.lbl_movies)) { navigateToLibraryType(CollectionType.MOVIES) }
-		val showsTab = createStaticTab(ctx.getString(R.string.lbl_tv_show)) { navigateToLibraryType(CollectionType.TVSHOWS) }
-		val playlistsTab = createStaticTab(ctx.getString(R.string.lbl_playlists)) { navigateToLibraryType(CollectionType.PLAYLISTS) }
+		val moviesTab = createStaticTab(context.getString(R.string.lbl_movies)) { navigateToLibraryType(CollectionType.MOVIES) }
+		val showsTab = createStaticTab(context.getString(R.string.lbl_tv_show)) { navigateToLibraryType(CollectionType.TVSHOWS) }
+		val playlistsTab = createStaticTab(context.getString(R.string.lbl_playlists)) { navigateToLibraryType(CollectionType.PLAYLISTS) }
 		val jellyfinTab =
-			createStaticTab(ctx.getString(R.string.lbl_jellyfin)) { settingsViewModel.show() }
+			createStaticTab(context.getString(R.string.lbl_jellyfin)) { settingsViewModel.show() }
 
-		navContainer?.addView(moviesTab)
-		navContainer?.addView(showsTab)
-		navContainer?.addView(playlistsTab)
-		navContainer?.addView(jellyfinTab)
+		if (moviesTab != null && showsTab != null && playlistsTab != null && jellyfinTab != null) {
+			navContainer?.addView(moviesTab)
+			navContainer?.addView(showsTab)
+			navContainer?.addView(playlistsTab)
+			navContainer?.addView(jellyfinTab)
 
-		// Set up basic focus navigation
-		view.findViewById<View>(R.id.toolbar_search)?.nextFocusRightId = moviesTab.id
-		moviesTab.nextFocusLeftId = R.id.toolbar_search
-		moviesTab.nextFocusRightId = showsTab.id
-		showsTab.nextFocusLeftId = moviesTab.id
-		showsTab.nextFocusRightId = playlistsTab.id
-		playlistsTab.nextFocusLeftId = showsTab.id
-		playlistsTab.nextFocusRightId = jellyfinTab.id
-		jellyfinTab.nextFocusLeftId = playlistsTab.id
-		jellyfinTab.nextFocusRightId = R.id.toolbar_user_avatar
-		view.findViewById<View>(R.id.toolbar_user_avatar)?.nextFocusLeftId = jellyfinTab.id
+			// Set up basic focus navigation
+			view.findViewById<View>(R.id.toolbar_search)?.nextFocusRightId = moviesTab.id
+			moviesTab.nextFocusLeftId = R.id.toolbar_search
+			moviesTab.nextFocusRightId = showsTab.id
+			showsTab.nextFocusLeftId = moviesTab.id
+			showsTab.nextFocusRightId = playlistsTab.id
+			playlistsTab.nextFocusLeftId = showsTab.id
+			playlistsTab.nextFocusRightId = jellyfinTab.id
+			jellyfinTab.nextFocusLeftId = playlistsTab.id
+			jellyfinTab.nextFocusRightId = R.id.toolbar_user_avatar
+			view.findViewById<View>(R.id.toolbar_user_avatar)?.nextFocusLeftId = jellyfinTab.id
+		}
 	}
 
-	private fun createStaticTab(text: String, onClickListener: () -> Unit): TextView {
-		return TextView(requireContext()).apply {
+	private fun createStaticTab(text: String, onClickListener: () -> Unit): TextView? {
+		val context = context ?: return null
+		return TextView(context).apply {
 			id = View.generateViewId()
 			layoutParams = ViewGroup.MarginLayoutParams(
 				ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -626,7 +649,7 @@ class HomeFragmentNetflixStyle : Fragment() {
 			)
 			background = ResourcesCompat.getDrawable(resources, R.drawable.nav_pill_animated_background, null)
 			stateListAnimator = android.animation.AnimatorInflater.loadStateListAnimator(
-				requireContext(),
+				context,
 				R.animator.nav_button_state_animator
 			)
 			isFocusable = true
@@ -699,7 +722,7 @@ class HomeFragmentNetflixStyle : Fragment() {
 		trailerContainer.alpha = 0f
 		trailerGradientOverlay.visibility = View.VISIBLE
 
-		val embedUrl = "https://www.youtube.com/embed/$videoId?autoplay=1&mute=1&controls=0&rel=0&modestbranding=1&playsinline=1"
+		val embedUrl = "https://www.youtube.com/embed/$videoId?autoplay=1&mute=1&controls=0&rel=0&modestbranding=1&playsinline=1&enablejsapi=1"
 
 		trailerWebView.webViewClient = object : WebViewClient() {
 			override fun onPageFinished(view: WebView?, url: String?) {
@@ -724,6 +747,7 @@ class HomeFragmentNetflixStyle : Fragment() {
 				error: android.webkit.WebResourceError?
 			) {
 				super.onReceivedError(view, request, error)
+				if (request?.isForMainFrame == false) return
 				Timber.w("Errore caricamento trailer: ${error?.description}")
 				registerTrailerFailure()
 				resetTrailer(clearWebView = true)
@@ -735,6 +759,7 @@ class HomeFragmentNetflixStyle : Fragment() {
 				errorResponse: android.webkit.WebResourceResponse?
 			) {
 				super.onReceivedHttpError(view, request, errorResponse)
+				if (request?.isForMainFrame == false) return
 				Timber.w("HTTP error loading trailer: ${errorResponse?.statusCode}")
 				registerTrailerFailure()
 				resetTrailer(clearWebView = true)
@@ -751,7 +776,7 @@ class HomeFragmentNetflixStyle : Fragment() {
 	            </style>
 	        </head>
 	        <body>
-	            <iframe src="$embedUrl" frameborder="0" allow="autoplay; encrypted-media"></iframe>
+	            <iframe src="$embedUrl" frameborder="0" allow="autoplay; encrypted-media; fullscreen"></iframe>
 	        </body>
 	        </html>
 	    """.trimIndent()
@@ -791,7 +816,7 @@ class HomeFragmentNetflixStyle : Fragment() {
 					response.use { res ->
 						if (!res.isSuccessful) return@withContext ""
 						val body = res.body?.string().orEmpty()
-						"""/watch\?v=([a-zA-Z0-9_-]{11})""".toRegex().find(body)?.groups?.get(1)?.value.orEmpty()
+						extractFirstYouTubeVideoIdFromSearch(body)
 					}
 				}
 
@@ -800,11 +825,9 @@ class HomeFragmentNetflixStyle : Fragment() {
 					return@launch
 				}
 
-				if (!checkedAllowedYoutubeVideo("https://www.youtube.com/watch?v=$videoId")) {
-					callback("")
-					return@launch
-				}
-
+				// Do not block the preview on oEmbed validation: on Android TV it often fails for
+				// embeddable videos even when the iframe can play correctly. The WebView handles
+				// final playback errors and falls back without freezing navigation.
 				callback(videoId)
 			} catch (e: Exception) {
 				registerTrailerFailure()
@@ -812,6 +835,16 @@ class HomeFragmentNetflixStyle : Fragment() {
 				callback("")
 			}
 		}
+	}
+
+
+	private fun extractFirstYouTubeVideoIdFromSearch(body: String): String {
+		return YOUTUBE_SEARCH_ID_PATTERNS
+			.asSequence()
+			.mapNotNull { pattern -> pattern.find(body)?.groups?.get(1)?.value }
+			.distinct()
+			.firstOrNull()
+			.orEmpty()
 	}
 
 

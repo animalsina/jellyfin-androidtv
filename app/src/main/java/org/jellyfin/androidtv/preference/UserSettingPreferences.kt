@@ -43,7 +43,7 @@ class UserSettingPreferences(
 		val homesection4 = enumPreference("homesection4", HomeSectionType.MOOD_LIGHT)
 		val homesection5 = enumPreference("homesection5", HomeSectionType.MOOD_SHORT)
 		val homesection6 = enumPreference("homesection6", HomeSectionType.EXTERNAL_PROVIDERS)
-		val homesection7 = enumPreference("homesection7", HomeSectionType.NONE)
+		val homesection7 = enumPreference("homesection7", HomeSectionType.ONLINE_NEW_RELEASES)
 		val homesection8 = enumPreference("homesection8", HomeSectionType.NONE)
 		val homesection9 = enumPreference("homesection9", HomeSectionType.NONE)
 	}

@@ -44,3 +44,12 @@ Add a configurable provider catalog registry:
 5. Cache TTL and last successful snapshot.
 6. Capability flags: internal HLS playback, app deep link, browser fallback, subscription-only.
 7. Per-provider visibility preferences.
+
+
+## Implemented in v1.0.19
+
+- External catalog cards no longer behave as blind app shortcuts. Opening a catalog title now shows a small action menu with internal playback for free streams, local server lookup, provider opening and direct local detail when a matching server item is known.
+- The home can show a “New online releases” row populated from an online release source. Titles are re-matched against the Jellyfin library on every home rebuild, including library scan notifications, so a newly imported title can switch to “Available on your server”.
+- Android TV/Projectivy channels are populated with SuperJelly external catalog and online-release rows when the feeds return content.
+- Trailer playback tries to stay inside SuperJelly first, then falls back to SmartTube/YouTube packages if the embedded player cannot load.
+- Provider availability remains conservative: exact free/included availability for Prime Video, Netflix, RaiPlay or Pluto requires a stable feed or partner API. Without that, SuperJelly shows search/open actions rather than pretending a full availability match is guaranteed.

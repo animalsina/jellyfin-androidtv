@@ -15,8 +15,12 @@ data class ExternalCatalogItem(
 	val backdropUrl: String? = null,
 	val group: String? = null,
 	val isFree: Boolean = true,
+	val releaseDate: String? = null,
+	val availabilityNote: String? = null,
+	val localItemId: UUID? = null,
+	val trailerUrl: String? = null,
 ) {
 	val stableId: UUID = UUID.nameUUIDFromBytes(
-		"$providerId|$title|${streamUrl.orEmpty()}".toByteArray(StandardCharsets.UTF_8)
+		"$providerId|$title|${streamUrl.orEmpty()}|${detailUrl.orEmpty()}|${releaseDate.orEmpty()}".toByteArray(StandardCharsets.UTF_8)
 	)
 }

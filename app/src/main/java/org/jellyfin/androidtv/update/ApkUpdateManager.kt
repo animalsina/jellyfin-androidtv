@@ -34,7 +34,18 @@ class ApkUpdateManager(private val activity: FragmentActivity) {
 	private val preferences = activity.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
 
 	fun checkForUpdates(force: Boolean = false) {
-		if (!force && checkedThisProcess) return
+		checkForUpdates(force = force, blockStartup = false, onCompleted = null)
+	}
+
+	fun checkForUpdates(
+		force: Boolean = false,
+		blockStartup: Boolean = false,
+		onCompleted: (() -> Unit)? = null,
+	) {
+		if (!force && checkedThisProcess) {
+			onCompleted?.invoke()
+			return
+		}
 		if (!force) checkedThisProcess = true
 
 		activity.lifecycleScope.launch {
@@ -43,21 +54,26 @@ class ApkUpdateManager(private val activity: FragmentActivity) {
 					if (activity.isFinishing || activity.isDestroyed) return@launch
 
 					val dismissedVersion = preferences.getString(KEY_DISMISSED_VERSION, null)
-					if (!force && dismissedVersion == result.update.version) return@launch
+					if (!force && dismissedVersion == result.update.version) {
+						onCompleted?.invoke()
+						return@launch
+					}
 
-					showUpdateDialog(result.update)
+					showUpdateDialog(result.update, blockStartup, onCompleted)
 				}
 				ApkUpdateCheckResult.NotFound -> {
 					if (force && !activity.isFinishing && !activity.isDestroyed) showNoUpdateDialog()
+					onCompleted?.invoke()
 				}
 				ApkUpdateCheckResult.Failed -> {
 					if (force && !activity.isFinishing && !activity.isDestroyed) showCheckFailedDialog()
+					onCompleted?.invoke()
 				}
 			}
 		}
 	}
 
-	private fun showUpdateDialog(update: RemoteApk) {
+	private fun showUpdateDialog(update: RemoteApk, blockStartup: Boolean = false, onCompleted: (() -> Unit)? = null) {
 		AlertDialog.Builder(activity)
 			.setTitle(activity.getString(R.string.apk_update_available_title))
 			.setMessage(
@@ -71,6 +87,10 @@ class ApkUpdateManager(private val activity: FragmentActivity) {
 			.setPositiveButton(R.string.apk_update_install) { _, _ -> prepareDownload(update) }
 			.setNegativeButton(R.string.apk_update_later) { _, _ ->
 				preferences.edit().putString(KEY_DISMISSED_VERSION, update.version).apply()
+				onCompleted?.invoke()
+			}
+			.setOnCancelListener {
+				if (blockStartup) onCompleted?.invoke()
 			}
 			.show()
 	}
