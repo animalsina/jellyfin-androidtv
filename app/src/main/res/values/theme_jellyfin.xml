@@ -41,10 +41,10 @@
         <item name="android:popupWindowStyle">@style/PopupWindow</item>
 
         <!-- Rounding Values -->
-        <item name="cardRounding">4dp</item>
-        <item name="buttonRounding">3dp</item>
-        <item name="inputRounding">3dp</item>
-        <item name="popupMenuRounding">3dp</item>
+        <item name="cardRounding">18dp</item>
+        <item name="buttonRounding">16dp</item>
+        <item name="inputRounding">12dp</item>
+        <item name="popupMenuRounding">16dp</item>
 
         <!-- Dim level of non-focus grid items -->
         <item name="overlayDimDimmedLevel">30%</item>

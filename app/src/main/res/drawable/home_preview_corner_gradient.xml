@@ -6,13 +6,13 @@
             <gradient
                 android:angle="0"
                 android:startColor="#FF000000"
-                android:centerColor="#00000000"
+                android:centerColor="#FF000000"
                 android:endColor="#00000000"
-                android:centerX="0.45"
+                android:centerX="0.25"
                 android:type="linear" />
         </shape>
     </item>
-    
+
     <!-- Bottom edge fade - black on bottom fading to transparent on top -->
     <item>
         <shape android:shape="rectangle">
@@ -21,7 +21,7 @@
                 android:startColor="#FF000000"
                 android:centerColor="#00000000"
                 android:endColor="#00000000"
-                android:centerY="0.55"
+                android:centerY="0.45"
                 android:type="linear" />
         </shape>
     </item>

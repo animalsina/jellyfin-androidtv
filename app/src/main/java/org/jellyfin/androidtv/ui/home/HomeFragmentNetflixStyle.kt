@@ -286,20 +286,14 @@ class HomeFragmentNetflixStyle : Fragment() {
 			else -> null
 		}
 
-		val externalBackdropUrl = item.externalBackdropUrl
-		if (!externalBackdropUrl.isNullOrBlank()) {
-			loadPreviewBackdrop(externalBackdropUrl, blurHash = null, itemId = nextItemId)
-		} else if (backdropImage != null) {
-			val backdropWidth = resources.getDimensionPixelSize(R.dimen.home_preview_width)
-			val backdropHeight = resources.getDimensionPixelSize(R.dimen.home_preview_width) * 3 / 4
-			val backdropUrl = backdropImage.getUrl(api, fillWidth = backdropWidth, fillHeight = backdropHeight)
-			loadPreviewBackdrop(backdropUrl, backdropImage.blurHash, nextItemId)
-		} else {
-			previewBackdropJob?.cancel()
-			currentBackdropUrl = null
-			previewBackground.visibility = View.GONE
-			previewGradient.visibility = View.GONE
-			previewBackground.setImageDrawable(null)
+		if (changedItem) {
+			// Carichiamo un backdrop leggermente più grande per il nuovo layout futuristico
+			val backdropWidth = 1280
+			val backdropHeight = 720
+			val backdropUrl = backdropImage?.getUrl(api, fillWidth = backdropWidth, fillHeight = backdropHeight)
+			if (backdropUrl != null) {
+				loadPreviewBackdrop(backdropUrl, backdropImage.blurHash, nextItemId)
+			}
 		}
 
 		previewTitle.text = baseItem.name

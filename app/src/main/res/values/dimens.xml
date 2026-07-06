@@ -3,7 +3,7 @@
     <dimen name="overscan_vertical">48dp</dimen>
 
     <fraction name="card_scale_default">100%</fraction>
-    <fraction name="card_scale_focus">115%</fraction>
+    <fraction name="card_scale_focus">110%</fraction>
 
     <!-- Set leanback card scale values -->
     <fraction name="lb_focus_zoom_factor_small">@fraction/card_scale_focus</fraction>
@@ -12,15 +12,15 @@
     <fraction name="lb_focus_zoom_factor_large">@fraction/card_scale_focus</fraction>
 
     <!-- Home screen preview section -->
-    <dimen name="home_preview_height">250dp</dimen>
-    <dimen name="home_preview_width">600dp</dimen>
-    
+    <dimen name="home_preview_height">350dp</dimen>
+    <dimen name="home_preview_width">700dp</dimen>
+
     <!-- Netflix-style row spacing -->
     <dimen name="lb_browse_rows_margin_top">0dp</dimen>
     <dimen name="lb_browse_rows_margin_bottom">22dp</dimen>
     <dimen name="lb_browse_item_vertical_spacing">10dp</dimen>
     <dimen name="lb_browse_item_horizontal_spacing">12dp</dimen>
-    
+
     <!-- Override additional Leanback spacing -->
     <dimen name="lb_browse_row_vmargin">22dp</dimen>
     <dimen name="lb_browse_padding_top">0dp</dimen>
@@ -32,7 +32,7 @@
     <dimen name="lb_browse_headers_vertical_margin">0dp</dimen>
     <dimen name="lb_browse_row_min_height">0dp</dimen>
     <dimen name="lb_browse_section_header_text_vertical_spacing">2dp</dimen>
-    
+
     <!-- Toolbar navigation buttons -->
     <dimen name="toolbar_nav_button_height">32dp</dimen>
     <dimen name="toolbar_nav_button_margin">2dp</dimen>
