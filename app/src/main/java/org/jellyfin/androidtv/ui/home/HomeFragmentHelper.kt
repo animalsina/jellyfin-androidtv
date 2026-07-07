@@ -7,7 +7,6 @@ import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.auth.repository.UserRepository
 import org.jellyfin.androidtv.constant.ChangeTriggerType
 import org.jellyfin.androidtv.data.repository.ExternalCatalogRepository
-import org.jellyfin.androidtv.data.repository.ExternalCatalogRepository.RaiPlayKind
 import org.jellyfin.androidtv.data.repository.ItemRepository
 import org.jellyfin.androidtv.ui.browsing.BrowseRowDef
 import org.jellyfin.sdk.api.client.ApiClient
@@ -108,6 +107,63 @@ class HomeFragmentHelper(
 		return HomeFragmentBrowseRowDefRow(BrowseRowDef(context.getString(R.string.lbl_on_now), query))
 	}
 
+	fun loadIncompleteSeries(userViews: Collection<BaseItemDto>): HomeFragmentRow {
+		val parentId = userViews
+			.find { it.collectionType == org.jellyfin.sdk.model.api.CollectionType.TVSHOWS }
+			?.id
+
+		val query = GetItemsRequest(
+			fields = ItemRepository.itemFields,
+			includeItemTypes = listOf(BaseItemKind.SERIES),
+			recursive = true,
+			parentId = parentId,
+			isPlayed = false,
+			sortBy = listOf(ItemSortBy.DATE_PLAYED),
+			sortOrder = listOf(SortOrder.DESCENDING),
+			limit = ITEM_LIMIT_RANDOM,
+		)
+
+		return HomeFragmentBrowseRowDefRow(BrowseRowDef(context.getString(R.string.home_section_incomplete_series), query, ITEM_LIMIT_RANDOM, false, true, arrayOf(ChangeTriggerType.TvPlayback)))
+	}
+
+	fun loadSeasonalEvents(userViews: Collection<BaseItemDto>): HomeFragmentRow {
+		val now = java.time.LocalDate.now()
+		val month = now.monthValue
+		val day = now.dayOfMonth
+
+		val genres = when {
+			// Natale (Dicembre e Gennaio fino al 7)
+			(month == 12) || (month == 1 && day <= 7) -> listOf("Christmas", "Holiday")
+			// Halloween (Ottobre)
+			(month == 10) -> listOf("Horror", "Halloween")
+			// Pasqua (Marzo/Aprile)
+			(month == 3 || month == 4) -> listOf("Fantasy", "Family")
+			// Estate (Giugno, Luglio, Agosto)
+			(month in 6..8) -> listOf("Adventure", "Animation")
+			// Default
+			else -> listOf("Family", "Comedy")
+		}
+
+		val parentId = userViews
+			.filter { it.collectionType == org.jellyfin.sdk.model.api.CollectionType.MOVIES || it.collectionType == org.jellyfin.sdk.model.api.CollectionType.TVSHOWS }
+			.takeIf { it.size == 1 }
+			?.firstOrNull()
+			?.id
+
+		val query = GetItemsRequest(
+			fields = ItemRepository.itemFields,
+			includeItemTypes = listOf(BaseItemKind.MOVIE, BaseItemKind.SERIES),
+			recursive = true,
+			sortBy = listOf(ItemSortBy.RANDOM),
+			limit = ITEM_LIMIT_RANDOM,
+			parentId = parentId,
+			genres = genres,
+			isPlayed = false,
+		)
+
+		return HomeFragmentBrowseRowDefRow(BrowseRowDef(context.getString(R.string.home_section_seasonal_events), query, ITEM_LIMIT_RANDOM, false, true))
+	}
+
 	// New row loader methods for Netflix-style rows
 	suspend fun loadRecommendedForYou(userViews: Collection<BaseItemDto>): HomeFragmentRow =
 		withContext(Dispatchers.IO) {
@@ -198,7 +254,7 @@ class HomeFragmentHelper(
 			isPlayed = isPlayed,
 		)
 
-		return HomeFragmentBrowseRowDefRow(BrowseRowDef(title, query, 50, false, true))
+		return HomeFragmentBrowseRowDefRow(BrowseRowDef(title, query, ITEM_LIMIT_RANDOM, false, true))
 	}
 
 	suspend fun loadGenreRandomMovies(userViews: Collection<BaseItemDto>): HomeFragmentRow =
@@ -234,33 +290,6 @@ class HomeFragmentHelper(
 	suspend fun loadExternalProviders(): HomeFragmentRow = withContext(Dispatchers.IO) {
 		HomeFragmentExternalProvidersRow(
 			items = externalCatalogRepository.loadHomeCatalog(limit = 180),
-			splitByCategory = true,
-		)
-	}
-
-	suspend fun loadPlutoCategory(title: String, groupMatchers: List<String>): HomeFragmentRow = withContext(Dispatchers.IO) {
-		HomeFragmentExternalProvidersRow(
-			items = externalCatalogRepository.loadCatalogByGroup(
-				providerIdPrefix = "pluto-tv",
-				groupMatchers = groupMatchers,
-				limit = 48,
-			),
-			title = title,
-		)
-	}
-
-	suspend fun loadRaiPlayFilm(title: String): HomeFragmentRow = withContext(Dispatchers.IO) {
-		HomeFragmentExternalProvidersRow(
-			items = externalCatalogRepository.loadRaiPlayCatalog(RaiPlayKind.FILM, limit = 60),
-			title = title,
-			splitByCategory = true,
-		)
-	}
-
-	suspend fun loadRaiPlaySeries(title: String): HomeFragmentRow = withContext(Dispatchers.IO) {
-		HomeFragmentExternalProvidersRow(
-			items = externalCatalogRepository.loadRaiPlayCatalog(RaiPlayKind.SERIES, limit = 60),
-			title = title,
 			splitByCategory = true,
 		)
 	}

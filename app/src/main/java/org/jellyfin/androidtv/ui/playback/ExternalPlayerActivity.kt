@@ -48,7 +48,7 @@ import kotlin.time.Duration.Companion.milliseconds
 class ExternalPlayerActivity : FragmentActivity() {
 	companion object {
 		const val EXTRA_POSITION = "position"
-		const val EXTRA_FORCE_VLC = "force_vlc"
+		const val EXTRA_PLAYER_PACKAGE = "player_package"
 	}
 
 	private var currentPlayer: ExternalPlayerApi? = null
@@ -121,9 +121,9 @@ class ExternalPlayerActivity : FragmentActivity() {
 			}
 
 			// Set configured app to launch
-			val forceVlc = intent.getBooleanExtra(EXTRA_FORCE_VLC, false)
-			if (forceVlc) {
-				setPackage("org.videolan.vlc")
+			val targetPackage = intent.getStringExtra(EXTRA_PLAYER_PACKAGE)
+			if (targetPackage != null) {
+				setPackage(targetPackage)
 			} else {
 				externalAppRepository
 					.getCurrentExternalPlayerApp(this@ExternalPlayerActivity)

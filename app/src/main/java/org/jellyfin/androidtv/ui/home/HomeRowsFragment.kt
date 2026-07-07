@@ -519,14 +519,8 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 			HomeSectionType.MOOD_ACTION -> helper.loadMoodAction(userViews)
 			HomeSectionType.MOOD_SHORT -> helper.loadMoodShort(userViews)
 			HomeSectionType.EXTERNAL_PROVIDERS -> helper.loadExternalProviders()
-			HomeSectionType.PLUTO_ACTION -> helper.loadPlutoCategory(getString(R.string.home_section_pluto_action), listOf("action", "azione", "avventura"))
-			HomeSectionType.PLUTO_COMEDY -> helper.loadPlutoCategory(getString(R.string.home_section_pluto_comedy), listOf("comedy", "commedia", "comedie"))
-			HomeSectionType.PLUTO_DRAMA -> helper.loadPlutoCategory(getString(R.string.home_section_pluto_drama), listOf("drama", "drammatico", "drama"))
-			HomeSectionType.PLUTO_THRILLER -> helper.loadPlutoCategory(getString(R.string.home_section_pluto_thriller), listOf("thriller", "crime", "giallo"))
-			HomeSectionType.PLUTO_DOCUMENTARY -> helper.loadPlutoCategory(getString(R.string.home_section_pluto_documentary), listOf("documentary", "documentari", "doc"))
-			HomeSectionType.PLUTO_SCIFI -> helper.loadPlutoCategory(getString(R.string.home_section_pluto_scifi), listOf("sci fi", "fantascienza", "science fiction"))
-			HomeSectionType.RAIPLAY_FILM -> helper.loadRaiPlayFilm(getString(R.string.home_section_raiplay_film))
-			HomeSectionType.RAIPLAY_SERIES -> helper.loadRaiPlaySeries(getString(R.string.home_section_raiplay_series))
+			HomeSectionType.INCOMPLETE_SERIES -> helper.loadIncompleteSeries(userViews)
+			HomeSectionType.SEASONAL_EVENTS -> helper.loadSeasonalEvents(userViews)
 			HomeSectionType.ONLINE_NEW_RELEASES -> helper.loadOnlineNewReleases()
 			else -> null
 		}

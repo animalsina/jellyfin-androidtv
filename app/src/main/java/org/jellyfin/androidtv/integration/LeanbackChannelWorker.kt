@@ -48,6 +48,7 @@ import org.jellyfin.androidtv.util.apiclient.itemImages
 import org.jellyfin.androidtv.util.apiclient.parentBackdropImages
 import org.jellyfin.androidtv.util.apiclient.parentImages
 import org.jellyfin.androidtv.util.dp
+import org.jellyfin.androidtv.util.componentName
 import org.jellyfin.androidtv.util.sdk.isUsable
 import org.jellyfin.androidtv.util.stripHtml
 import org.jellyfin.sdk.api.client.ApiClient
@@ -129,6 +130,7 @@ class LeanbackChannelWorker(
 	private val userViewsRepository by inject<UserViewsRepository>()
 	private val imageHelper by inject<ImageHelper>()
 	private val externalCatalogRepository by inject<ExternalCatalogRepository>()
+	private val externalAppRepository by inject<org.jellyfin.androidtv.data.repository.ExternalAppRepository>()
 	private val imageLoader by inject<ImageLoader>()
 
 	private data class HomeSectionChannel(
@@ -402,6 +404,7 @@ class LeanbackChannelWorker(
 		val configuredSections = userSettingPreferences.activeHomesections
 		val allProgramSections = HomeSectionType.entries
 			.filterNot { it == HomeSectionType.NONE || it == HomeSectionType.ONLINE_NEW_RELEASES }
+			.filterNot { it.isExternalCatalogSection() } // Don't auto-add external catalog sections to home channels unless enabled
 		val sectionChannels = (configuredSections + allProgramSections)
 			.distinct()
 			.mapNotNull { section ->
@@ -525,16 +528,36 @@ class LeanbackChannelWorker(
 			)
 		).content.items.orEmpty()
 		HomeSectionType.EXTERNAL_PROVIDERS -> externalCatalogRepository.loadHomeCatalog(limit = PROJECTIVY_CHANNEL_ITEM_LIMIT)
-		HomeSectionType.PLUTO_ACTION -> externalCatalogRepository.loadCatalogByGroup("pluto-tv", listOf("action", "azione", "avventura"), PROJECTIVY_CHANNEL_ITEM_LIMIT)
-		HomeSectionType.PLUTO_COMEDY -> externalCatalogRepository.loadCatalogByGroup("pluto-tv", listOf("comedy", "commedia", "comedie"), PROJECTIVY_CHANNEL_ITEM_LIMIT)
-		HomeSectionType.PLUTO_DRAMA -> externalCatalogRepository.loadCatalogByGroup("pluto-tv", listOf("drama", "drammatico", "drama"), PROJECTIVY_CHANNEL_ITEM_LIMIT)
-		HomeSectionType.PLUTO_THRILLER -> externalCatalogRepository.loadCatalogByGroup("pluto-tv", listOf("thriller", "crime", "giallo"), PROJECTIVY_CHANNEL_ITEM_LIMIT)
-		HomeSectionType.PLUTO_DOCUMENTARY -> externalCatalogRepository.loadCatalogByGroup("pluto-tv", listOf("documentary", "documentari", "doc"), PROJECTIVY_CHANNEL_ITEM_LIMIT)
-		HomeSectionType.PLUTO_SCIFI -> externalCatalogRepository.loadCatalogByGroup("pluto-tv", listOf("sci fi", "fantascienza", "science fiction"), PROJECTIVY_CHANNEL_ITEM_LIMIT)
-		HomeSectionType.RAIPLAY_FILM -> externalCatalogRepository.loadRaiPlayCatalog(ExternalCatalogRepository.RaiPlayKind.FILM, PROJECTIVY_CHANNEL_ITEM_LIMIT)
-		HomeSectionType.RAIPLAY_SERIES -> externalCatalogRepository.loadRaiPlayCatalog(ExternalCatalogRepository.RaiPlayKind.SERIES, PROJECTIVY_CHANNEL_ITEM_LIMIT)
+		HomeSectionType.INCOMPLETE_SERIES -> queryMovieSeries(
+			userViews,
+			listOf(ItemSortBy.DATE_PLAYED),
+			includeTypes = listOf(BaseItemKind.SERIES),
+			isPlayed = false
+		)
+		HomeSectionType.SEASONAL_EVENTS -> loadSeasonalItems(userViews)
 		HomeSectionType.ONLINE_NEW_RELEASES -> externalCatalogRepository.loadNewReleases(limit = PROJECTIVY_CHANNEL_ITEM_LIMIT)
 		HomeSectionType.NONE -> emptyList()
+	}
+
+	private suspend fun loadSeasonalItems(userViews: Collection<BaseItemDto>): List<BaseItemDto> {
+		val now = java.time.LocalDate.now()
+		val month = now.monthValue
+		val day = now.dayOfMonth
+
+		val genres = when {
+			(month == 12) || (month == 1 && day <= 7) -> listOf("Christmas", "Holiday")
+			(month == 10) -> listOf("Horror", "Halloween")
+			(month == 3 || month == 4) -> listOf("Fantasy", "Family")
+			(month in 6..8) -> listOf("Adventure", "Animation")
+			else -> listOf("Family", "Comedy")
+		}
+
+		return queryMovieSeries(
+			userViews,
+			listOf(ItemSortBy.RANDOM),
+			genres = genres,
+			isPlayed = false // Filter for unplayed as requested for "intelligence"
+		)
 	}
 
 	private suspend fun queryMovieSeries(
@@ -585,28 +608,23 @@ class LeanbackChannelWorker(
 	}
 
 	private fun HomeSectionType.isExternalCatalogSection(): Boolean = when (this) {
-		HomeSectionType.EXTERNAL_PROVIDERS,
-		HomeSectionType.PLUTO_ACTION,
-		HomeSectionType.PLUTO_COMEDY,
-		HomeSectionType.PLUTO_DRAMA,
-		HomeSectionType.PLUTO_THRILLER,
-		HomeSectionType.PLUTO_DOCUMENTARY,
-		HomeSectionType.PLUTO_SCIFI,
-		HomeSectionType.RAIPLAY_FILM,
-		HomeSectionType.RAIPLAY_SERIES -> true
+		HomeSectionType.EXTERNAL_PROVIDERS -> true
 		else -> false
 	}
 
 	private fun getExternalCatalogChannels(items: List<ExternalCatalogItem>): List<ExternalCatalogChannel> {
-		return items
-			.groupBy { item -> externalChannelTitle(item) }
-			.toList()
-			.sortedByDescending { (_, groupItems) -> groupItems.size }
-			.take(PROJECTIVY_EXTERNAL_CHANNEL_LIMIT)
-			.mapNotNull { (title, groupItems) ->
-				val limited = groupItems.take(PROJECTIVY_CHANNEL_ITEM_LIMIT * 2)
-				if (limited.isEmpty()) null else ExternalCatalogChannel(sanitizeChannelKey(title), title, limited)
-			}
+		// Only create one combined channel for external catalog to avoid spamming rows
+		val plutoItems = items.filter { it.providerId.startsWith("pluto") }.take(PROJECTIVY_CHANNEL_ITEM_LIMIT)
+		val raiItems = items.filter { it.providerId.startsWith("raiplay") }.take(PROJECTIVY_CHANNEL_ITEM_LIMIT)
+
+		val result = mutableListOf<ExternalCatalogChannel>()
+		if (plutoItems.isNotEmpty()) {
+			result.add(ExternalCatalogChannel("pluto_tv", "Pluto TV", plutoItems))
+		}
+		if (raiItems.isNotEmpty()) {
+			result.add(ExternalCatalogChannel("raiplay", "RaiPlay", raiItems))
+		}
+		return result
 	}
 
 	private fun externalChannelTitle(item: ExternalCatalogItem): String {
@@ -653,6 +671,50 @@ class LeanbackChannelWorker(
 		} else {
 			item.posterUrl ?: item.backdropUrl ?: imageHelper.getResourceUrl(context, R.drawable.tile_land_tv)
 		}
+
+		val launchIntent = if (!item.streamUrl.isNullOrBlank()) {
+			val intent = Intent(Intent.ACTION_VIEW).apply {
+				setDataAndType(Uri.parse(item.streamUrl), "video/*")
+				addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+			}
+
+			if (userPreferences[UserPreferences.useExternalPlayer]) {
+				externalAppRepository.getCurrentExternalPlayerApp(context)?.componentName?.let {
+					intent.setComponent(it)
+				}
+				// Try to populate extras for known players
+				try {
+					val resolveInfo = context.packageManager.queryIntentActivities(intent, 0).firstOrNull()
+					if (resolveInfo != null) {
+						val playerApi = externalAppRepository.getExternalPlayerApi(resolveInfo.activityInfo)
+						val playData = org.jellyfin.androidtv.ui.playback.external.ExternalPlayData(
+							url = Uri.parse(item.streamUrl),
+							title = item.title,
+							fileName = null,
+							externalSubtitles = emptyList(),
+							position = Duration.ZERO
+						)
+						playerApi.populateIntent(intent, playData)
+					}
+				} catch (e: Exception) {
+					Timber.w(e, "Failed to populate external player extras for Leanback channel")
+				}
+			}
+			intent
+		} else if (!item.detailUrl.isNullOrBlank()) {
+			// Direct provider app intent
+			Intent(Intent.ACTION_VIEW, Uri.parse(item.detailUrl)).apply {
+				addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+			}
+		} else {
+			// Fallback to app startup
+			Intent(context, StartupActivity::class.java).apply {
+				item.localItemId?.let { putExtra(StartupActivity.EXTRA_ITEM_ID, it.toString()) }
+				putExtra(StartupActivity.EXTRA_EXTERNAL_ID, item.stableId.toString())
+				putExtra(StartupActivity.EXTRA_PROVIDER_ID, item.providerId)
+			}
+		}
+
 		return PreviewProgram.Builder()
 			.setChannelId(ContentUris.parseId(channelUri))
 			.setInternalProviderId(item.stableId.toString())
@@ -671,11 +733,7 @@ class LeanbackChannelWorker(
 				if (useWideAspect) TvContractCompat.PreviewPrograms.ASPECT_RATIO_16_9
 				else TvContractCompat.PreviewPrograms.ASPECT_RATIO_MOVIE_POSTER
 			)
-			.setIntent(Intent(context, StartupActivity::class.java).apply {
-				item.localItemId?.let { putExtra(StartupActivity.EXTRA_ITEM_ID, it.toString()) }
-				putExtra(StartupActivity.EXTRA_EXTERNAL_ID, item.stableId.toString())
-				putExtra(StartupActivity.EXTRA_PROVIDER_ID, item.providerId)
-			})
+			.setIntent(launchIntent)
 			.build()
 			.toContentValues()
 	}

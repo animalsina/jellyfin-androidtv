@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
 	alias(libs.plugins.aboutlibraries)
 	alias(libs.plugins.android.application)
@@ -115,6 +117,39 @@ tasks.register("versionTxt") {
 		val versionString = "v${android.defaultConfig.versionName}=${android.defaultConfig.versionCode}"
 		logger.info("Writing [$versionString] to $path")
 		path.writeText("$versionString\n")
+	}
+}
+
+tasks.register<Exec>("deployApk") {
+	group = "deployment"
+	description = "Uploads the debug APK to SFTP location"
+	dependsOn("assembleDebug")
+
+	val apkFile = layout.buildDirectory.file("outputs/apk/debug/superjelly-androidtv-v${project.getVersionName()}-debug.apk").get().asFile
+
+	doFirst {
+		val localProperties = Properties()
+		val localPropertiesFile = project.rootProject.file("local.properties")
+		if (localPropertiesFile.exists()) {
+			localPropertiesFile.inputStream().use { input ->
+				localProperties.load(input)
+			}
+		}
+
+		val host = localProperties.getProperty("deploy.host") ?: System.getenv("SFTP_HOST")
+		val user = localProperties.getProperty("deploy.user") ?: System.getenv("SFTP_USER")
+		val path = localProperties.getProperty("deploy.path") ?: System.getenv("SFTP_PATH") ?: "/home/animalsina/docker-compose-files/file-manager/myfiles"
+
+		if (host == null || user == null) {
+			throw GradleException("Deployment failed: Please define deploy.host and deploy.user in local.properties or environment variables.")
+		}
+
+		println("Uploading ${apkFile.name} to $user@$host:$path...")
+		commandLine("scp", apkFile.absolutePath, "$user@$host:$path")
+	}
+
+	doLast {
+		println("APK uploaded successfully to SFTP!")
 	}
 }
 

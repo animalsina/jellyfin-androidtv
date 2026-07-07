@@ -31,6 +31,8 @@ import org.jellyfin.androidtv.auth.repository.SessionRepository
 import org.jellyfin.androidtv.auth.repository.SessionRepositoryState
 import org.jellyfin.androidtv.auth.repository.UserRepository
 import org.jellyfin.androidtv.data.eventhandling.SocketHandler
+import org.jellyfin.androidtv.data.repository.ExternalAppRepository
+import org.jellyfin.androidtv.preference.UserPreferences
 import org.jellyfin.androidtv.databinding.ActivityStartupBinding
 import org.jellyfin.androidtv.integration.LeanbackChannelWorker
 import org.jellyfin.androidtv.ui.background.AppBackground
@@ -76,8 +78,10 @@ class StartupActivity : FragmentActivity() {
 	private val mediaManager: MediaManager by inject()
 	private val sessionRepository: SessionRepository by inject()
 	private val userRepository: UserRepository by inject()
+	private val userPreferences: UserPreferences by inject()
 	private val navigationRepository: NavigationRepository by inject()
 	private val externalCatalogRepository: org.jellyfin.androidtv.data.repository.ExternalCatalogRepository by inject()
+	private val externalAppRepository: ExternalAppRepository by inject()
 	private val itemLauncher: ItemLauncher by inject()
 	private val playbackHelper: org.jellyfin.androidtv.util.PlaybackHelper by inject()
 	private val videoQueueManager: org.jellyfin.androidtv.ui.playback.VideoQueueManager by inject()
@@ -173,65 +177,11 @@ class StartupActivity : FragmentActivity() {
 			launch { socketListener.updateSession() }
 		}
 
-		// VLC check for Projectivy Launcher
-		val vlcPackage = "org.videolan.vlc"
-		val isVlcInstalled = runCatching { packageManager.getPackageInfo(vlcPackage, 0) }.isSuccess
+		// External Player check for Projectivy Launcher
+		val externalPlayerInfo = externalAppRepository.getCurrentExternalPlayerApp(this)
+		val targetPackage = externalPlayerInfo?.packageName
 
-		if (isVlcInstalled) {
-			// External Item redirect to VLC
-			if (itemId == null && externalId != null) {
-				val externalItem = withContext(Dispatchers.IO) {
-					val catalog = externalCatalogRepository.loadHomeCatalog(500)
-					val newReleases = externalCatalogRepository.loadNewReleases(limit = 100)
-					(catalog + newReleases).find { it.stableId == externalId }
-				}
-
-				if (externalItem != null && !externalItem.streamUrl.isNullOrBlank()) {
-					Timber.i("Redirecting external item ${externalItem.title} directly to VLC")
-					val vlcIntent = Intent(Intent.ACTION_VIEW).apply {
-						setPackage(vlcPackage)
-						setDataAndType(Uri.parse(externalItem.streamUrl), "video/*")
-						putExtra("title", externalItem.title)
-						addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-					}
-					startActivity(vlcIntent)
-					finish()
-					return
-				}
-			}
-
-			// Local Item redirect to VLC
-			if (itemId != null && !itemIsUserView) {
-				val item = withContext(Dispatchers.IO) {
-					api.userLibraryApi.getItem(itemId = itemId).content
-				}
-
-				if (item.type == BaseItemKind.MOVIE || item.type == BaseItemKind.EPISODE) {
-					Timber.i("Redirecting local item ${item.name} directly to VLC")
-					val itemsToPlay = suspendCoroutine<List<BaseItemDto>> { continuation ->
-						playbackHelper.getItemsToPlay(this@StartupActivity, item, false, false, object : Response<List<BaseItemDto>>() {
-							override fun onResponse(response: List<BaseItemDto>) {
-								continuation.resume(response)
-							}
-						})
-					}
-
-					if (itemsToPlay.isNotEmpty()) {
-						videoQueueManager.setCurrentVideoQueue(itemsToPlay)
-						videoQueueManager.setCurrentMediaPosition(0)
-
-						val intent = Intent(this@StartupActivity, ExternalPlayerActivity::class.java).apply {
-							putExtra(ExternalPlayerActivity.EXTRA_FORCE_VLC, true)
-							putExtra(ExternalPlayerActivity.EXTRA_POSITION, 0L)
-						}
-						startActivity(intent)
-						finish()
-						return
-					}
-				}
-			}
-		}
-
+		// External Item redirect
 		if (itemId == null && externalId != null) {
 			val externalItem = withContext(Dispatchers.IO) {
 				val catalog = externalCatalogRepository.loadHomeCatalog(500)
@@ -240,10 +190,85 @@ class StartupActivity : FragmentActivity() {
 			}
 
 			if (externalItem != null) {
-				withContext(Dispatchers.Main) {
-					org.jellyfin.androidtv.streaming.ExternalCatalogLauncher.open(this@StartupActivity, org.jellyfin.androidtv.ui.itemhandling.ExternalCatalogBaseRowItem(externalItem))
+				if (!externalItem.streamUrl.isNullOrBlank()) {
+					if (targetPackage != null) {
+						Timber.i("Redirecting external item ${externalItem.title} directly to external player $targetPackage")
+						val playIntent = Intent(Intent.ACTION_VIEW).apply {
+							setPackage(targetPackage)
+							setDataAndType(Uri.parse(externalItem.streamUrl), "video/*")
+							putExtra("title", externalItem.title)
+							addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+						}
+						startActivity(playIntent)
+						finish()
+						return
+					} else {
+						Timber.i("Opening external item ${externalItem.title} in internal stream player")
+						val intent = Intent(this, org.jellyfin.androidtv.ui.playback.ExternalStreamPlayerActivity::class.java).apply {
+							putExtra(org.jellyfin.androidtv.ui.playback.ExternalStreamPlayerActivity.EXTRA_URL, externalItem.streamUrl)
+							putExtra(org.jellyfin.androidtv.ui.playback.ExternalStreamPlayerActivity.EXTRA_TITLE, externalItem.title)
+							addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+						}
+						startActivity(intent)
+						finish()
+						return
+					}
+				} else if (!externalItem.detailUrl.isNullOrBlank()) {
+					Timber.i("Opening external detail URL: ${externalItem.detailUrl}")
+					val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(externalItem.detailUrl)).apply {
+						addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+					}
+					startActivity(browserIntent)
+					finish()
+					return
 				}
-				// We don't finish here because we want the main app to be in background or at home
+			}
+		}
+
+		// Local Item redirect
+		if (itemId != null && !itemIsUserView) {
+			val item = withContext(Dispatchers.IO) {
+				api.userLibraryApi.getItem(itemId = itemId).content
+			}
+
+			if (item.type == BaseItemKind.MOVIE || item.type == BaseItemKind.EPISODE) {
+				val itemsToPlay = suspendCoroutine<List<BaseItemDto>> { continuation ->
+					playbackHelper.getItemsToPlay(this@StartupActivity, item, false, false, object : Response<List<BaseItemDto>>() {
+						override fun onResponse(response: List<BaseItemDto>) {
+							continuation.resume(response)
+						}
+					})
+				}
+
+				if (itemsToPlay.isNotEmpty()) {
+					videoQueueManager.setCurrentVideoQueue(itemsToPlay)
+					videoQueueManager.setCurrentMediaPosition(0)
+
+					if (targetPackage != null) {
+						Timber.i("Redirecting local item ${item.name} directly to external player $targetPackage")
+						val intent = Intent(this@StartupActivity, ExternalPlayerActivity::class.java).apply {
+							putExtra(ExternalPlayerActivity.EXTRA_PLAYER_PACKAGE, targetPackage)
+							putExtra(ExternalPlayerActivity.EXTRA_POSITION, 0L)
+						}
+						startActivity(intent)
+						finish()
+						return
+					} else {
+						Timber.i("Redirecting local item ${item.name} directly to internal player")
+						val destination = if (userPreferences[UserPreferences.playbackRewriteVideoEnabled]) {
+							Destinations.videoPlayerNew(0)
+						} else {
+							Destinations.videoPlayer(0)
+						}
+						navigationRepository.reset(destination, true)
+						val intent = Intent(this, MainActivity::class.java).apply {
+							addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_TASK_ON_HOME)
+						}
+						startActivity(intent)
+						finish()
+						return
+					}
+				}
 			}
 		}
 

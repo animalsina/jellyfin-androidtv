@@ -470,6 +470,8 @@
     <string name="home_section_mood_action">Action mood</string>
     <string name="home_section_mood_short">Short picks</string>
     <string name="home_section_external_providers">Streaming catalogs</string>
+    <string name="home_section_incomplete_series">Incomplete TV shows</string>
+    <string name="home_section_seasonal_events">Seasonal events</string>
     <string name="home_section_none">None</string>
     <string name="home_section_i">Home section %1$d</string>
     <string name="searchable_hint">Search SuperJelly</string>

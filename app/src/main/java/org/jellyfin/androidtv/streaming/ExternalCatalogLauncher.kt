@@ -6,15 +6,21 @@ import android.net.Uri
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import org.jellyfin.androidtv.R
+import org.jellyfin.androidtv.data.repository.ExternalAppRepository
+import org.jellyfin.androidtv.preference.UserPreferences
 import org.jellyfin.androidtv.ui.itemhandling.ExternalCatalogBaseRowItem
 import org.jellyfin.androidtv.ui.navigation.Destinations
 import org.jellyfin.androidtv.ui.navigation.NavigationRepository
 import org.jellyfin.androidtv.ui.playback.ExternalStreamPlayerActivity
+import org.jellyfin.androidtv.util.componentName
 import org.koin.java.KoinJavaComponent
 import timber.log.Timber
+import kotlin.time.Duration
 
 object ExternalCatalogLauncher {
 	private val navigationRepository by KoinJavaComponent.inject<NavigationRepository>(NavigationRepository::class.java)
+	private val userPreferences by KoinJavaComponent.inject<UserPreferences>(UserPreferences::class.java)
+	private val externalAppRepository by KoinJavaComponent.inject<ExternalAppRepository>(ExternalAppRepository::class.java)
 
 	@JvmStatic
 	fun open(context: Context, rowItem: ExternalCatalogBaseRowItem) {
@@ -28,7 +34,7 @@ object ExternalCatalogLauncher {
 
 			if (!item.streamUrl.isNullOrBlank()) {
 				add(Action(context.getString(R.string.lbl_external_catalog_play_here)) {
-					openStreamInternal(context, item.streamUrl, item.title)
+					playStream(context, item.streamUrl, item.title)
 				})
 			}
 
@@ -54,6 +60,16 @@ object ExternalCatalogLauncher {
 			.show()
 	}
 
+	private fun playStream(context: Context, url: String, title: String) {
+		if (userPreferences[UserPreferences.useExternalPlayer]) {
+			if (!openStreamExternal(context, url, title)) {
+				openStreamInternal(context, url, title)
+			}
+		} else {
+			openStreamInternal(context, url, title)
+		}
+	}
+
 	private fun openStreamInternal(context: Context, url: String, title: String): Boolean {
 		return try {
 			context.startActivity(
@@ -65,28 +81,58 @@ object ExternalCatalogLauncher {
 			true
 		} catch (error: Exception) {
 			Timber.w(error, "Unable to start internal stream player")
-			openStreamExternal(context, url)
+			openStreamExternal(context, url, title)
 		}
 	}
 
-	private fun openStreamExternal(context: Context, url: String): Boolean {
-		val intents = listOf(
-			Intent(Intent.ACTION_VIEW).setDataAndType(Uri.parse(url), "application/x-mpegURL"),
-			Intent(Intent.ACTION_VIEW).setDataAndType(Uri.parse(url), "video/*"),
-			Intent(Intent.ACTION_VIEW, Uri.parse(url)),
-		)
+	private fun openStreamExternal(context: Context, url: String, title: String): Boolean {
+		val intent = Intent(Intent.ACTION_VIEW).apply {
+			setDataAndType(Uri.parse(url), "video/*")
+			addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
-		for (intent in intents) {
-			try {
-				intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-				context.startActivity(intent)
-				return true
-			} catch (error: Exception) {
-				Timber.w(error, "Unable to open external stream")
+			// Try to use the configured external player if available
+			externalAppRepository.getCurrentExternalPlayerApp(context)?.componentName?.let {
+				setComponent(it)
 			}
 		}
 
-		return false
+		// Try to populate extra fields for known players (like VLC/MX Player)
+		try {
+			val resolveInfo = context.packageManager.queryIntentActivities(intent, 0).firstOrNull()
+			if (resolveInfo != null) {
+				val playerApi = externalAppRepository.getExternalPlayerApi(resolveInfo.activityInfo)
+				// Create a dummy play data for the external player API
+				val playData = org.jellyfin.androidtv.ui.playback.external.ExternalPlayData(
+					url = Uri.parse(url),
+					title = title,
+					fileName = null,
+					externalSubtitles = emptyList(),
+					position = Duration.ZERO
+				)
+				playerApi.populateIntent(intent, playData)
+			}
+		} catch (e: Exception) {
+			Timber.w(e, "Failed to populate external player extras")
+		}
+
+		return try {
+			context.startActivity(intent)
+			true
+		} catch (error: Exception) {
+			Timber.w(error, "Unable to open external stream")
+
+			// Fallback to any player if the specific one failed
+			val fallbackIntent = Intent(Intent.ACTION_VIEW).apply {
+				setDataAndType(Uri.parse(url), "video/*")
+				addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+			}
+			try {
+				context.startActivity(fallbackIntent)
+				true
+			} catch (e: Exception) {
+				false
+			}
+		}
 	}
 
 	private fun openUrl(context: Context, url: String?): Boolean {
