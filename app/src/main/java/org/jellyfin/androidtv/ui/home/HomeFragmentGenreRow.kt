@@ -10,7 +10,6 @@ import org.jellyfin.androidtv.ui.presentation.MutableObjectAdapter
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.CollectionType
-import org.jellyfin.sdk.model.api.ItemFields
 import org.jellyfin.sdk.model.api.ItemSortBy
 import org.jellyfin.sdk.model.api.SortOrder
 import org.jellyfin.sdk.model.api.request.GetItemsRequest
@@ -36,7 +35,7 @@ class HomeFragmentGenreRow(
 
 		// Create the request for this genre
 		val request = GetItemsRequest(
-			fields = ItemRepository.itemFields + ItemFields.GENRES,
+			fields = ItemRepository.browseFields.toList(),
 			includeItemTypes = includeTypes.toList(),
 			recursive = true,
 			genres = listOf(selectedGenre),

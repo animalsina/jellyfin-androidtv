@@ -10,7 +10,6 @@ import org.jellyfin.androidtv.ui.presentation.MutableObjectAdapter
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.CollectionType
-import org.jellyfin.sdk.model.api.ItemFields
 import org.jellyfin.sdk.model.api.ItemSortBy
 import org.jellyfin.sdk.model.api.SortOrder
 import org.jellyfin.sdk.model.api.request.GetItemsRequest
@@ -39,7 +38,7 @@ class HomeFragmentPopularRow(
 	}
 
 	private fun createPlayCountRequest() = GetItemsRequest(
-		fields = ItemRepository.itemFields + ItemFields.PLAY_ACCESS + ItemFields.MEDIA_STREAMS,
+		fields = ItemRepository.browseFields.toList(),
 		includeItemTypes = includeTypes.toList(),
 		recursive = true,
 		sortBy = listOf(ItemSortBy.PLAY_COUNT),
@@ -49,7 +48,7 @@ class HomeFragmentPopularRow(
 	)
 
 	private fun createCommunityRatingRequest() = GetItemsRequest(
-		fields = ItemRepository.itemFields,
+		fields = ItemRepository.browseFields.toList(),
 		includeItemTypes = includeTypes.toList(),
 		recursive = true,
 		sortBy = listOf(ItemSortBy.COMMUNITY_RATING),
@@ -60,7 +59,7 @@ class HomeFragmentPopularRow(
 	)
 
 	private fun createTrendingRequest() = GetItemsRequest(
-		fields = ItemRepository.itemFields,
+		fields = ItemRepository.browseFields.toList(),
 		includeItemTypes = includeTypes.toList(),
 		recursive = true,
 		sortBy = listOf(ItemSortBy.DATE_PLAYED),
@@ -70,7 +69,7 @@ class HomeFragmentPopularRow(
 	)
 
 	private fun createRecentlyReleasedRequest() = GetItemsRequest(
-		fields = ItemRepository.itemFields + ItemFields.DATE_CREATED,
+		fields = ItemRepository.browseFields.toList(),
 		includeItemTypes = includeTypes.toList(),
 		recursive = true,
 		sortBy = listOf(ItemSortBy.PREMIERE_DATE),

@@ -10,7 +10,6 @@ import org.jellyfin.androidtv.ui.presentation.MutableObjectAdapter
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.CollectionType
-import org.jellyfin.sdk.model.api.ItemFields
 import org.jellyfin.sdk.model.api.ItemSortBy
 import org.jellyfin.sdk.model.api.SortOrder
 import org.jellyfin.sdk.model.api.request.GetItemsRequest
@@ -45,7 +44,7 @@ class HomeFragmentRecommendedRow(
 		//    similar to popular/well-rated content
 
 		return GetItemsRequest(
-			fields = ItemRepository.itemFields + ItemFields.GENRES + ItemFields.PEOPLE,
+			fields = ItemRepository.browseFields.toList(),
 			includeItemTypes = listOf(BaseItemKind.MOVIE, BaseItemKind.SERIES),
 			recursive = true,
 			sortBy = listOf(ItemSortBy.RANDOM),
@@ -59,7 +58,7 @@ class HomeFragmentRecommendedRow(
 	}
 
 	private fun createUnplayedFavoritesRequest() = GetItemsRequest(
-		fields = ItemRepository.itemFields + ItemFields.GENRES,
+		fields = ItemRepository.browseFields.toList(),
 		includeItemTypes = listOf(BaseItemKind.MOVIE, BaseItemKind.SERIES),
 		recursive = true,
 		sortBy = listOf(ItemSortBy.COMMUNITY_RATING),
@@ -71,7 +70,7 @@ class HomeFragmentRecommendedRow(
 	)
 
 	private fun createRecommendedForYouRequest() = GetItemsRequest(
-		fields = ItemRepository.itemFields + ItemFields.GENRES + ItemFields.PEOPLE,
+		fields = ItemRepository.browseFields.toList(),
 		includeItemTypes = listOf(BaseItemKind.MOVIE, BaseItemKind.SERIES),
 		recursive = true,
 		sortBy = listOf(ItemSortBy.RANDOM),

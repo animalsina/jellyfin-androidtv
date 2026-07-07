@@ -547,6 +547,10 @@
     <string name="lbl_home">Home</string>
     <string name="random">Casuale</string>
     <string name="pref_playback_advanced">Preferenze di riproduzione avanzate</string>
+    <string name="home_section_incomplete_series">Serie TV in corso</string>
+    <string name="home_section_seasonal_events">Selezione stagionale</string>
+    <string name="lbl_remaining_episodes">%1$d episodi rimanenti</string>
+    <string name="lbl_remaining_episodes_with_date">%1$d episodi rimanenti • Ultima visione %2$s</string>
     <string name="all_channels">Tutti i canali</string>
     <string name="current_queue">Coda corrente</string>
     <string name="unreleased">Non ancora uscito</string>

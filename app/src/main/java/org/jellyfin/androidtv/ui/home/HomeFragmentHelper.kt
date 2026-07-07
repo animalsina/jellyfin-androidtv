@@ -50,7 +50,7 @@ class HomeFragmentHelper(
 	suspend fun loadResumeVideo(): HomeFragmentRow = withContext(Dispatchers.IO) {
 		val query = GetResumeItemsRequest(
 			limit = ITEM_LIMIT_RESUME,
-			fields = ItemRepository.itemFields,
+			fields = ItemRepository.browseFields.toList(),
 			imageTypeLimit = 1,
 			enableTotalRecordCount = false,
 			mediaTypes = listOf(MediaType.VIDEO),
@@ -76,7 +76,7 @@ class HomeFragmentHelper(
 
 	fun loadLatestLiveTvRecordings(): HomeFragmentRow {
 		val query = GetRecordingsRequest(
-			fields = ItemRepository.itemFields,
+			fields = ItemRepository.browseFields.toList(),
 			enableImages = true,
 			limit = ITEM_LIMIT_RECORDINGS
 		)
@@ -98,7 +98,7 @@ class HomeFragmentHelper(
 	fun loadOnNow(): HomeFragmentRow {
 		val query = GetRecommendedProgramsRequest(
 			isAiring = true,
-			fields = ItemRepository.itemFields,
+			fields = ItemRepository.browseFields.toList(),
 			imageTypeLimit = 1,
 			enableTotalRecordCount = false,
 			limit = ITEM_LIMIT_ON_NOW
@@ -113,7 +113,7 @@ class HomeFragmentHelper(
 			?.id
 
 		val query = GetItemsRequest(
-			fields = ItemRepository.itemFields,
+			fields = (ItemRepository.browseFields + ItemFields.ITEM_COUNTS).toList(),
 			includeItemTypes = listOf(BaseItemKind.SERIES),
 			recursive = true,
 			parentId = parentId,
@@ -151,14 +151,13 @@ class HomeFragmentHelper(
 			?.id
 
 		val query = GetItemsRequest(
-			fields = ItemRepository.itemFields,
+			fields = ItemRepository.browseFields.toList(),
 			includeItemTypes = listOf(BaseItemKind.MOVIE, BaseItemKind.SERIES),
 			recursive = true,
 			sortBy = listOf(ItemSortBy.RANDOM),
 			limit = ITEM_LIMIT_RANDOM,
 			parentId = parentId,
 			genres = genres,
-			isPlayed = false,
 		)
 
 		return HomeFragmentBrowseRowDefRow(BrowseRowDef(context.getString(R.string.home_section_seasonal_events), query, ITEM_LIMIT_RANDOM, false, true))
@@ -244,7 +243,7 @@ class HomeFragmentHelper(
 			?.id
 
 		val query = GetItemsRequest(
-			fields = ItemRepository.itemFields + ItemFields.DATE_CREATED,
+			fields = ItemRepository.browseFields.toList(),
 			includeItemTypes = includeTypes,
 			recursive = true,
 			sortBy = sortBy,
@@ -304,11 +303,11 @@ class HomeFragmentHelper(
 
 	private suspend fun loadLocalTitleMatches(): Map<String, java.util.UUID> = withContext(Dispatchers.IO) {
 		runCatching {
-			val result = api.itemsApi.getItems(
-				GetItemsRequest(
-					fields = ItemRepository.itemFields,
-					includeItemTypes = listOf(BaseItemKind.MOVIE, BaseItemKind.SERIES),
-					recursive = true,
+		val result = api.itemsApi.getItems(
+			GetItemsRequest(
+				fields = ItemRepository.browseFields.toList(),
+				includeItemTypes = listOf(BaseItemKind.MOVIE, BaseItemKind.SERIES),
+				recursive = true,
 					enableTotalRecordCount = false,
 					imageTypeLimit = 1,
 					limit = ITEM_LIMIT_LOCAL_MATCHES,

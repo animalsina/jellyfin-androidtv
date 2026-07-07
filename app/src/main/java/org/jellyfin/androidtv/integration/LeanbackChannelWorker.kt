@@ -86,7 +86,7 @@ import kotlin.time.Duration
  */
 class LeanbackChannelWorker(
 	private val context: Context,
-	workerParams: WorkerParameters,
+	private val workerParams: WorkerParameters,
 ) : CoroutineWorker(context, workerParams), KoinComponent {
 	companion object {
 		private const val PERIODIC_UPDATE_REQUEST_NAME = "LeanbackChannelPeriodicUpdateRequest"
@@ -532,7 +532,8 @@ class LeanbackChannelWorker(
 			userViews,
 			listOf(ItemSortBy.DATE_PLAYED),
 			includeTypes = listOf(BaseItemKind.SERIES),
-			isPlayed = false
+			isPlayed = false,
+			fields = (ItemRepository.browseFields + ItemFields.ITEM_COUNTS).toList()
 		)
 		HomeSectionType.SEASONAL_EVENTS -> loadSeasonalItems(userViews)
 		HomeSectionType.ONLINE_NEW_RELEASES -> externalCatalogRepository.loadNewReleases(limit = PROJECTIVY_CHANNEL_ITEM_LIMIT)
@@ -552,12 +553,31 @@ class LeanbackChannelWorker(
 			else -> listOf("Family", "Comedy")
 		}
 
-		return queryMovieSeries(
+		// Intelligent logic: prioritized unplayed, then fallback to old played
+		val items = queryMovieSeries(
 			userViews,
 			listOf(ItemSortBy.RANDOM),
 			genres = genres,
-			isPlayed = false // Filter for unplayed as requested for "intelligence"
+			isPlayed = false,
+			fields = ItemRepository.browseFields.toList()
 		)
+
+		if (items.size >= 5) return items
+
+		// Fallback: items played more than 90 days ago
+		val playedItems = queryMovieSeries(
+			userViews,
+			listOf(ItemSortBy.DATE_PLAYED),
+			genres = genres,
+			isPlayed = true,
+			sortOrder = listOf(SortOrder.ASCENDING),
+			fields = ItemRepository.browseFields.toList()
+		).filter { item ->
+			val lastPlayed = item.userData?.lastPlayedDate
+			lastPlayed == null || lastPlayed.isBefore(java.time.LocalDateTime.now().minusDays(90))
+		}
+
+		return (items + playedItems).distinctBy { it.id }.take(PROJECTIVY_CHANNEL_ITEM_LIMIT)
 	}
 
 	private suspend fun queryMovieSeries(
@@ -568,6 +588,7 @@ class LeanbackChannelWorker(
 		isPlayed: Boolean? = null,
 		sortOrder: List<SortOrder> = listOf(SortOrder.DESCENDING),
 		genres: List<String>? = null,
+		fields: List<ItemFields> = ItemRepository.browseFields.toList(),
 	): List<BaseItemDto> {
 		val parentId = userViews
 			.filter { it.collectionType == org.jellyfin.sdk.model.api.CollectionType.MOVIES || it.collectionType == org.jellyfin.sdk.model.api.CollectionType.TVSHOWS }
@@ -576,7 +597,7 @@ class LeanbackChannelWorker(
 			?.id
 		return api.itemsApi.getItems(
 			GetItemsRequest(
-				fields = ItemRepository.itemFields + ItemFields.DATE_CREATED,
+				fields = fields,
 				includeItemTypes = includeTypes,
 				recursive = true,
 				sortBy = sortBy,
@@ -854,6 +875,8 @@ class LeanbackChannelWorker(
 			else -> item.indexNumber?.toString().orEmpty()
 		}
 
+		val description = item.overview?.stripHtml()
+
 		return PreviewProgram.Builder()
 			.setChannelId(ContentUris.parseId(channelUri))
 			.setInternalProviderId(item.id.toString())
@@ -869,7 +892,7 @@ class LeanbackChannelWorker(
 			)
 			.setTitle(item.seriesName ?: item.name)
 			.setEpisodeTitle(if (item.type == BaseItemKind.EPISODE) item.name else null)
-			.setDescription(item.overview?.stripHtml())
+			.setDescription(description)
 			.setReleaseDate(
 				if (item.premiereDate != null) DateTimeFormatter.ISO_DATE.format(item.premiereDate)
 				else null

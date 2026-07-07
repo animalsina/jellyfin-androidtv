@@ -10,7 +10,6 @@ import org.jellyfin.androidtv.ui.presentation.MutableObjectAdapter
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.api.CollectionType
-import org.jellyfin.sdk.model.api.ItemFields
 import org.jellyfin.sdk.model.api.ItemSortBy
 import org.jellyfin.sdk.model.api.SortOrder
 import org.jellyfin.sdk.model.api.request.GetItemsRequest
@@ -25,7 +24,7 @@ class HomeFragmentMoodRow(
 ) : HomeFragmentRow {
 	override fun addToRowsAdapter(context: Context, cardPresenter: CardPresenter, rowsAdapter: MutableObjectAdapter<Row>) {
 		val request = GetItemsRequest(
-			fields = ItemRepository.itemFields + ItemFields.GENRES + ItemFields.MEDIA_STREAMS,
+			fields = ItemRepository.browseFields.toList(),
 			includeItemTypes = listOf(BaseItemKind.MOVIE, BaseItemKind.SERIES),
 			recursive = true,
 			genres = genres.toList(),
