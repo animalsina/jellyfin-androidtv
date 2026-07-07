@@ -7,7 +7,6 @@ import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.extensions.itemsApi
 import org.jellyfin.sdk.model.api.BaseItemDto
 import org.jellyfin.sdk.model.api.BaseItemKind
-import org.jellyfin.sdk.model.api.ItemFields
 import org.jellyfin.sdk.model.api.request.GetItemsRequest
 import java.time.LocalDateTime
 
@@ -21,7 +20,7 @@ object SeriesProgressHelper {
 				parentId = seriesId,
 				recursive = true,
 				includeItemTypes = listOf(BaseItemKind.EPISODE),
-				fields = (ItemRepository.browseFields + ItemFields.ITEM_COUNTS).toList(),
+				fields = emptyList(),
 				limit = MAX_SERIES_EPISODES,
 				enableTotalRecordCount = false,
 			)

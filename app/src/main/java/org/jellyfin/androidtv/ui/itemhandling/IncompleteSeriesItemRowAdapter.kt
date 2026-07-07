@@ -32,13 +32,16 @@ class IncompleteSeriesItemRowAdapter(
 
 				val items = withContext(Dispatchers.IO) {
 					response.items.orEmpty()
-						.map { series ->
+						.take(MAX_PROGRESS_CANDIDATES)
+						.chunked(PROGRESS_BATCH_SIZE)
+						.flatMap { batch ->
+							batch.map { series ->
 							async {
 								val progress = SeriesProgressHelper.loadIncompleteProgress(api, series)
 								if (progress == null) null else IncompleteSeriesRow(series, progress)
 							}
+							}.awaitAll()
 						}
-						.awaitAll()
 						.filterNotNull()
 				}
 
@@ -59,4 +62,9 @@ class IncompleteSeriesItemRowAdapter(
 		val series: BaseItemDto,
 		val progress: org.jellyfin.androidtv.data.model.IncompleteSeriesProgress,
 	)
+
+	private companion object {
+		private const val MAX_PROGRESS_CANDIDATES = 16
+		private const val PROGRESS_BATCH_SIZE = 3
+	}
 }

@@ -9,7 +9,9 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewConfiguration
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.widget.PopupMenu
+import android.widget.ProgressBar
 import androidx.leanback.app.RowsSupportFragment
 import androidx.leanback.widget.BaseGridView
 import androidx.leanback.widget.ListRow
@@ -153,6 +155,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	private var lastToolbarUpRequestAt = 0L
 	private var consumeToolbarUpKeyUp = false
 	private var contextMenuShowing = false
+	private var homeLoadingProgress: ProgressBar? = null
 
 	// Special rows
 	private val notificationsRow by lazy { NotificationsHomeFragmentRow(lifecycleScope, notificationsRepository) }
@@ -223,6 +226,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 
 	override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
 		super.onViewCreated(view, savedInstanceState)
+		installHomeLoadingProgress(view)
 
 		verticalGridView?.apply {
 			if (id == View.NO_ID) id = View.generateViewId()
@@ -249,6 +253,37 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 				clearFocus()
 			}
 		}
+	}
+
+	private fun installHomeLoadingProgress(root: View) {
+		val parent = activity?.findViewById<FrameLayout>(android.R.id.content) ?: return
+		if (homeLoadingProgress?.parent != null) return
+
+		val height = (4 * resources.displayMetrics.density).toInt().coerceAtLeast(3)
+		val progressBar = ProgressBar(requireContext(), null, android.R.attr.progressBarStyleHorizontal).apply {
+			max = 100
+			progress = 0
+			isIndeterminate = false
+			visibility = View.GONE
+			importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+		}
+
+		val params = FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, height, Gravity.TOP)
+
+		parent.addView(progressBar, params)
+		homeLoadingProgress = progressBar
+	}
+
+	private fun showHomeLoadingProgress(completed: Int, total: Int) {
+		homeLoadingProgress?.apply {
+			max = total.coerceAtLeast(1)
+			progress = completed.coerceIn(0, max)
+			visibility = View.VISIBLE
+		}
+	}
+
+	private fun hideHomeLoadingProgress() {
+		homeLoadingProgress?.visibility = View.GONE
 	}
 
 	private fun handleTouchHomeScroll(recyclerView: RecyclerView, event: MotionEvent): Boolean {
@@ -383,10 +418,11 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	}
 
 	private fun buildHomeRows(forceUpdateSettings: Boolean = false) {
-		buildRowsJob?.cancel()
-		buildRowsJob = lifecycleScope.launch {
-			try {
-				val currentUser = withTimeout(30.seconds) {
+	buildRowsJob?.cancel()
+	buildRowsJob = lifecycleScope.launch {
+		try {
+			showHomeLoadingProgress(0, 1)
+			val currentUser = withTimeout(30.seconds) {
 					userRepository.currentUser.filterNotNull().first()
 				}
 
@@ -397,9 +433,10 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 
 				// Navigating back to home should be instant. Reuse the existing rows unless settings changed
 				// or the cache is old enough that a full structural rebuild is actually useful.
-				if (!forceUpdateSettings && rowsAdapter.size() > 0 && homeSections == loadedHomeSections && now - lastRowsBuildAt < HOME_ROWS_REBUILD_TTL_MS) {
-					return@launch
-				}
+			if (!forceUpdateSettings && rowsAdapter.size() > 0 && homeSections == loadedHomeSections && now - lastRowsBuildAt < HOME_ROWS_REBUILD_TTL_MS) {
+				hideHomeLoadingProgress()
+				return@launch
+			}
 
 				loadedHomeSections = homeSections
 				lastRowsBuildAt = now
@@ -411,9 +448,12 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 				val recyclerView = verticalGridView
 				var initialPreviewSet = false
 
-				val prioritySections = homeSections.filter(::isPriorityHomeSection).take(MAX_INITIAL_HOME_ROWS)
-				val deferredSections = homeSections.filterNot { section -> prioritySections.contains(section) }
-				val priorityRows = withContext(Dispatchers.IO) {
+			val prioritySections = homeSections.filter(::isPriorityHomeSection).take(MAX_INITIAL_HOME_ROWS)
+			val deferredSections = homeSections.filterNot { section -> prioritySections.contains(section) }
+			val totalLoadingSteps = (prioritySections.size + deferredSections.size + if (includeLiveTvRows) 1 else 0).coerceAtLeast(1)
+			var completedLoadingSteps = 0
+			showHomeLoadingProgress(completedLoadingSteps, totalLoadingSteps)
+			val priorityRows = withContext(Dispatchers.IO) {
 					prioritySections.mapNotNull { section ->
 						if (!isAdded) null else loadRowForSection(section, includeLiveTvRows, userViews)
 					}
@@ -447,10 +487,12 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 					}
 				}
 
-				withContext(Dispatchers.Main) {
-					rowsAdapter.clear()
-					priorityRows.forEach { row -> row.addToRowsAdapter(ctx, cardPresenter, rowsAdapter) }
-					recyclerView?.post {
+			withContext(Dispatchers.Main) {
+				rowsAdapter.clear()
+				priorityRows.forEach { row -> row.addToRowsAdapter(ctx, cardPresenter, rowsAdapter) }
+				completedLoadingSteps = prioritySections.size
+				showHomeLoadingProgress(completedLoadingSteps, totalLoadingSteps)
+				recyclerView?.post {
 						val firstRow = rowsAdapter.firstOrNull() as? ListRow
 						val adapterFirstRow = firstRow?.adapter as? ItemRowAdapter
 						if (adapterFirstRow != null && adapterFirstRow.size() > 0) {
@@ -464,21 +506,27 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 					}
 				}
 
-				for (section in deferredSections) {
-					if (!isAdded) break
-					appendRow(withContext(Dispatchers.IO) { loadRowForSection(section, includeLiveTvRows, userViews) })
-					delay(75)
-				}
-
-				if (includeLiveTvRows && isAdded) {
-					val onNowRow = withContext(Dispatchers.IO) { helper.loadOnNow() }
-					appendRow(onNowRow)
-				}
-			} catch (e: Exception) {
-				Timber.e(e, "Error building home rows")
+			for (section in deferredSections) {
+				if (!isAdded) break
+				appendRow(withContext(Dispatchers.IO) { loadRowForSection(section, includeLiveTvRows, userViews) })
+				completedLoadingSteps += 1
+				showHomeLoadingProgress(completedLoadingSteps, totalLoadingSteps)
+				delay(75)
 			}
+
+			if (includeLiveTvRows && isAdded) {
+				val onNowRow = withContext(Dispatchers.IO) { helper.loadOnNow() }
+				appendRow(onNowRow)
+				completedLoadingSteps += 1
+				showHomeLoadingProgress(completedLoadingSteps, totalLoadingSteps)
+			}
+		} catch (e: Exception) {
+			Timber.e(e, "Error building home rows")
+		} finally {
+			hideHomeLoadingProgress()
 		}
 	}
+}
 
 	private fun isPriorityHomeSection(section: HomeSectionType): Boolean = when (section) {
 		HomeSectionType.RESUME,

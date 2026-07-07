@@ -328,7 +328,7 @@ class HomeFragmentHelper(
 	private const val ITEM_LIMIT_NEXT_UP = 15
 	private const val ITEM_LIMIT_ON_NOW = 15
 	private const val ITEM_LIMIT_RANDOM = 20
-	private const val ITEM_LIMIT_INCOMPLETE_SERIES_CANDIDATES = 40
+	private const val ITEM_LIMIT_INCOMPLETE_SERIES_CANDIDATES = 16
 	private const val ITEM_LIMIT_LOCAL_MATCHES = 1200
 }
 }

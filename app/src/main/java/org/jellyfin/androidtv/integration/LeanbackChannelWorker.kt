@@ -390,6 +390,10 @@ class LeanbackChannelWorker(
 			store.edit { putString(name, uri?.toString()) }
 		}
 
+		if (uri != null && default) {
+			TvContractCompat.requestChannelBrowsable(context, ContentUris.parseId(uri))
+		}
+
 		// Update logo
 		if (uri != null) {
 			ResourcesCompat.getDrawable(context.resources, R.mipmap.app_icon, context.theme)?.let {
@@ -423,10 +427,14 @@ class LeanbackChannelWorker(
 		val allProgramSections = HomeSectionType.entries
 			.filterNot { it == HomeSectionType.NONE || it == HomeSectionType.ONLINE_NEW_RELEASES }
 			.filterNot { it.isExternalCatalogSection() } // Don't auto-add external catalog sections to home channels unless enabled
-		val sectionChannels = (configuredSections + allProgramSections)
-			.distinct()
-			.mapNotNull { section ->
-				val items = runCatching { loadItemsForHomeSection(section, userViews) }
+			val orderedSections = (configuredSections + allProgramSections)
+				.distinct()
+				.let { sections ->
+					listOf(HomeSectionType.SEASONAL_EVENTS) + sections.filterNot { it == HomeSectionType.SEASONAL_EVENTS }
+				}
+			val sectionChannels = orderedSections
+				.mapNotNull { section ->
+					val items = runCatching { loadItemsForHomeSection(section, userViews) }
 					.onFailure { Timber.w(it, "Unable to populate Android TV channel for $section") }
 					.getOrDefault(emptyList())
 				if (items.isEmpty() && section != HomeSectionType.SEASONAL_EVENTS) null
