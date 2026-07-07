@@ -429,7 +429,7 @@ class LeanbackChannelWorker(
 				val items = runCatching { loadItemsForHomeSection(section, userViews) }
 					.onFailure { Timber.w(it, "Unable to populate Android TV channel for $section") }
 					.getOrDefault(emptyList())
-				if (items.isEmpty()) null
+				if (items.isEmpty() && section != HomeSectionType.SEASONAL_EVENTS) null
 				else HomeSectionChannel(section.serializedName, context.getString(section.nameRes), items.take(PROJECTIVY_CHANNEL_ITEM_LIMIT))
 			}
 
@@ -558,7 +558,7 @@ class LeanbackChannelWorker(
 			listOf(ItemSortBy.DATE_PLAYED),
 			includeTypes = listOf(BaseItemKind.SERIES),
 			isPlayed = false,
-			fields = (ItemRepository.browseFields + ItemFields.ITEM_COUNTS).toList()
+			fields = projectivyPreviewFields(ItemFields.ITEM_COUNTS)
 		)
 
 		return withContext(Dispatchers.IO) {
@@ -592,7 +592,7 @@ class LeanbackChannelWorker(
 			listOf(ItemSortBy.RANDOM),
 			genres = genres,
 			isPlayed = false,
-			fields = ItemRepository.browseFields.toList()
+			fields = projectivyPreviewFields()
 		)
 
 		if (items.size >= 5) return items
@@ -604,7 +604,7 @@ class LeanbackChannelWorker(
 			genres = genres,
 			isPlayed = true,
 			sortOrder = listOf(SortOrder.ASCENDING),
-			fields = ItemRepository.browseFields.toList()
+			fields = projectivyPreviewFields()
 		).filter { item ->
 			val lastPlayed = item.userData?.lastPlayedDate
 			lastPlayed == null || lastPlayed.isBefore(java.time.LocalDateTime.now().minusDays(90))
@@ -621,7 +621,7 @@ class LeanbackChannelWorker(
 		isPlayed: Boolean? = null,
 		sortOrder: List<SortOrder> = listOf(SortOrder.DESCENDING),
 		genres: List<String>? = null,
-		fields: List<ItemFields> = ItemRepository.browseFields.toList(),
+		fields: List<ItemFields> = projectivyPreviewFields(),
 	): List<BaseItemDto> {
 		val parentId = userViews
 			.filter { it.collectionType == org.jellyfin.sdk.model.api.CollectionType.MOVIES || it.collectionType == org.jellyfin.sdk.model.api.CollectionType.TVSHOWS }
@@ -717,6 +717,9 @@ class LeanbackChannelWorker(
 			items.map { createExternalPreviewProgram(channelUri, it) }.toTypedArray()
 		)
 	}
+
+	private fun projectivyPreviewFields(vararg additionalFields: ItemFields): List<ItemFields> =
+		(ItemRepository.browseFields + ItemFields.REMOTE_TRAILERS + additionalFields).toList()
 
 	@SuppressLint("RestrictedApi")
 	private fun createExternalPreviewProgram(channelUri: Uri, item: ExternalCatalogItem, useWideAspect: Boolean = false): ContentValues {
@@ -927,6 +930,9 @@ class LeanbackChannelWorker(
 			.setTitle(item.seriesName ?: item.name)
 			.setEpisodeTitle(if (item.type == BaseItemKind.EPISODE) item.name else null)
 			.setDescription(description)
+			.apply {
+				item.getProjectivyPreviewVideoUri()?.let(::setPreviewVideoUri)
+			}
 			.setReleaseDate(
 				if (item.premiereDate != null) DateTimeFormatter.ISO_DATE.format(item.premiereDate)
 				else null
@@ -957,6 +963,12 @@ class LeanbackChannelWorker(
 				if ((item.indexNumber ?: 0) > 0) setEpisodeNumber(episodeString, item.indexNumber!!)
 			}.build().toContentValues()
 	}
+
+	private fun BaseItemDto.getProjectivyPreviewVideoUri(): Uri? = remoteTrailers.orEmpty()
+		.asSequence()
+		.mapNotNull { it.url?.takeIf(String::isNotBlank) }
+		.mapNotNull { url -> runCatching { Uri.parse(url) }.getOrNull() }
+		.firstOrNull { uri -> uri.scheme == "http" || uri.scheme == "https" }
 
 	/**
 	 * Updates the "watch next" row with new and unfinished episodes. Does not include movies, music
