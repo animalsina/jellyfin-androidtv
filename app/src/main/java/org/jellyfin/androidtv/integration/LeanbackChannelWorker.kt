@@ -28,13 +28,16 @@ import coil3.request.CachePolicy
 import coil3.request.ImageRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.first
 import org.jellyfin.androidtv.R
 import org.jellyfin.androidtv.constant.HomeSectionType
 import org.jellyfin.androidtv.data.model.ExternalCatalogItem
+import org.jellyfin.androidtv.data.model.IncompleteSeriesProgress
 import org.jellyfin.androidtv.data.repository.ExternalCatalogRepository
 import org.jellyfin.androidtv.data.repository.ItemRepository
+import org.jellyfin.androidtv.data.repository.SeriesProgressHelper
 import org.jellyfin.androidtv.data.repository.UserViewsRepository
 import org.jellyfin.androidtv.integration.provider.ImageProvider
 import org.jellyfin.androidtv.preference.UserPreferences
@@ -137,6 +140,11 @@ class LeanbackChannelWorker(
 		val key: String,
 		val title: String,
 		val items: List<Any>,
+	)
+
+	private data class IncompleteSeriesChannelItem(
+		val series: BaseItemDto,
+		val progress: IncompleteSeriesProgress,
 	)
 
 	private data class ExternalCatalogChannel(
@@ -275,13 +283,16 @@ class LeanbackChannelWorker(
 				}
 			}
 			homeSectionChannels.forEach { channelData ->
+				val requestBrowsable = channelData.key == HomeSectionType.SEASONAL_EVENTS.serializedName ||
+					channelData.key == HomeSectionType.INCOMPLETE_SERIES.serializedName
 				val channel = getChannelUri(
 					"home_${channelData.key}",
 					Channel.Builder()
 						.setType(TvContractCompat.Channels.TYPE_PREVIEW)
 						.setDisplayName(channelData.title)
 						.setAppLinkIntent(Intent(context, StartupActivity::class.java))
-						.build()
+						.build(),
+					default = requestBrowsable
 				)
 				if (channel != null) {
 					collectForPrefetch(channelData.items)
@@ -289,11 +300,18 @@ class LeanbackChannelWorker(
 						val isWide = channelData.key == HomeSectionType.RECOMMENDED_FOR_YOU.serializedName ||
 									 channelData.key == HomeSectionType.TRENDING_THIS_WEEK.serializedName ||
 									 channelData.key.startsWith("genre_")
-						when (item) {
-							is BaseItemDto -> createPreviewProgram(channel, item, preferParentThumb, useWideAspect = isWide)
-							is ExternalCatalogItem -> createExternalPreviewProgram(channel, item, useWideAspect = isWide)
-							else -> null
-						}
+					when (item) {
+						is BaseItemDto -> createPreviewProgram(channel, item, preferParentThumb, useWideAspect = isWide)
+						is IncompleteSeriesChannelItem -> createPreviewProgram(
+							channel,
+							item.series,
+							preferParentThumb,
+							useWideAspect = isWide,
+							descriptionOverride = item.progress.summary(context),
+						)
+						is ExternalCatalogItem -> createExternalPreviewProgram(channel, item, useWideAspect = isWide)
+						else -> null
+					}
 					}.toTypedArray()
 					context.contentResolver.bulkInsert(
 						TvContractCompat.PreviewPrograms.CONTENT_URI,
@@ -528,16 +546,31 @@ class LeanbackChannelWorker(
 			)
 		).content.items.orEmpty()
 		HomeSectionType.EXTERNAL_PROVIDERS -> externalCatalogRepository.loadHomeCatalog(limit = PROJECTIVY_CHANNEL_ITEM_LIMIT)
-		HomeSectionType.INCOMPLETE_SERIES -> queryMovieSeries(
+		HomeSectionType.INCOMPLETE_SERIES -> loadIncompleteSeriesItems(userViews)
+		HomeSectionType.SEASONAL_EVENTS -> loadSeasonalItems(userViews)
+		HomeSectionType.ONLINE_NEW_RELEASES -> externalCatalogRepository.loadNewReleases(limit = PROJECTIVY_CHANNEL_ITEM_LIMIT)
+		HomeSectionType.NONE -> emptyList()
+	}
+
+	private suspend fun loadIncompleteSeriesItems(userViews: Collection<BaseItemDto>): List<IncompleteSeriesChannelItem> {
+		val candidates = queryMovieSeries(
 			userViews,
 			listOf(ItemSortBy.DATE_PLAYED),
 			includeTypes = listOf(BaseItemKind.SERIES),
 			isPlayed = false,
 			fields = (ItemRepository.browseFields + ItemFields.ITEM_COUNTS).toList()
 		)
-		HomeSectionType.SEASONAL_EVENTS -> loadSeasonalItems(userViews)
-		HomeSectionType.ONLINE_NEW_RELEASES -> externalCatalogRepository.loadNewReleases(limit = PROJECTIVY_CHANNEL_ITEM_LIMIT)
-		HomeSectionType.NONE -> emptyList()
+
+		return withContext(Dispatchers.IO) {
+			candidates.map { series ->
+				async {
+					val progress = SeriesProgressHelper.loadIncompleteProgress(api, series)
+					if (progress == null) null else IncompleteSeriesChannelItem(series, progress)
+				}
+			}.awaitAll()
+				.filterNotNull()
+				.take(PROJECTIVY_CHANNEL_ITEM_LIMIT)
+		}
 	}
 
 	private suspend fun loadSeasonalItems(userViews: Collection<BaseItemDto>): List<BaseItemDto> {
@@ -546,11 +579,11 @@ class LeanbackChannelWorker(
 		val day = now.dayOfMonth
 
 		val genres = when {
-			(month == 12) || (month == 1 && day <= 7) -> listOf("Christmas", "Holiday")
-			(month == 10) -> listOf("Horror", "Halloween")
-			(month == 3 || month == 4) -> listOf("Fantasy", "Family")
-			(month in 6..8) -> listOf("Adventure", "Animation")
-			else -> listOf("Family", "Comedy")
+			(month == 12) || (month == 1 && day <= 7) -> listOf("Christmas", "Holiday", "Family", "Fantasy", "Comedy", "Romance")
+			(month == 10) -> listOf("Horror", "Thriller", "Mystery", "Fantasy")
+			(month == 3 || month == 4) -> listOf("Fantasy", "Family", "Adventure", "Animation")
+			(month in 6..8) -> listOf("Adventure", "Animation", "Action", "Comedy", "Family")
+			else -> listOf("Family", "Comedy", "Adventure")
 		}
 
 		// Intelligent logic: prioritized unplayed, then fallback to old played
@@ -863,7 +896,8 @@ class LeanbackChannelWorker(
 		channelUri: Uri,
 		item: BaseItemDto,
 		preferParentThumb: Boolean,
-		useWideAspect: Boolean = false
+		useWideAspect: Boolean = false,
+		descriptionOverride: String? = null,
 	): ContentValues {
 		val imageUri = item.getPosterArtImageUrl(preferParentThumb, useWideAspect)
 		val seasonString = item.parentIndexNumber?.toString().orEmpty()
@@ -875,7 +909,7 @@ class LeanbackChannelWorker(
 			else -> item.indexNumber?.toString().orEmpty()
 		}
 
-		val description = item.overview?.stripHtml()
+		val description = descriptionOverride ?: item.overview?.stripHtml()
 
 		return PreviewProgram.Builder()
 			.setChannelId(ContentUris.parseId(channelUri))

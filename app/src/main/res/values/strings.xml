@@ -697,6 +697,14 @@
         <item quantity="one">%1$s episode</item>
         <item quantity="other">%1$s episodes</item>
     </plurals>
+    <plurals name="incomplete_series_progress">
+        <item quantity="one">%1$d of %2$d episodes left</item>
+        <item quantity="other">%1$d of %2$d episodes left</item>
+    </plurals>
+    <plurals name="incomplete_series_progress_with_last">
+        <item quantity="one">Last watched %1$s • %2$d of %3$d episodes left</item>
+        <item quantity="other">Last watched %1$s • %2$d of %3$d episodes left</item>
+    </plurals>
     <plurals name="items">
         <item quantity="one">%1$s item</item>
         <item quantity="other">%1$s items</item>

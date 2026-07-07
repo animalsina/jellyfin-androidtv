@@ -120,10 +120,10 @@ class HomeFragmentHelper(
 			isPlayed = false,
 			sortBy = listOf(ItemSortBy.DATE_PLAYED),
 			sortOrder = listOf(SortOrder.DESCENDING),
-			limit = ITEM_LIMIT_RANDOM,
+			limit = ITEM_LIMIT_INCOMPLETE_SERIES_CANDIDATES,
 		)
 
-		return HomeFragmentBrowseRowDefRow(BrowseRowDef(context.getString(R.string.home_section_incomplete_series), query, ITEM_LIMIT_RANDOM, false, true, arrayOf(ChangeTriggerType.TvPlayback)))
+		return HomeFragmentIncompleteSeriesRow(BrowseRowDef(context.getString(R.string.home_section_incomplete_series), query, ITEM_LIMIT_RANDOM, false, true, arrayOf(ChangeTriggerType.TvPlayback)))
 	}
 
 	fun loadSeasonalEvents(userViews: Collection<BaseItemDto>): HomeFragmentRow {
@@ -325,9 +325,10 @@ class HomeFragmentHelper(
 		// Maximum amount of items loaded for a row
 		private const val ITEM_LIMIT_RESUME = 15
 		private const val ITEM_LIMIT_RECORDINGS = 15
-		private const val ITEM_LIMIT_NEXT_UP = 15
-		private const val ITEM_LIMIT_ON_NOW = 15
-		private const val ITEM_LIMIT_RANDOM = 20
-		private const val ITEM_LIMIT_LOCAL_MATCHES = 1200
-	}
+	private const val ITEM_LIMIT_NEXT_UP = 15
+	private const val ITEM_LIMIT_ON_NOW = 15
+	private const val ITEM_LIMIT_RANDOM = 20
+	private const val ITEM_LIMIT_INCOMPLETE_SERIES_CANDIDATES = 40
+	private const val ITEM_LIMIT_LOCAL_MATCHES = 1200
+}
 }

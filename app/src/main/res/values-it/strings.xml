@@ -703,4 +703,14 @@
     <string name="backdrop_behavior_without_blur">Sfondo senza opacità</string>
     <string name="playback_info_play_method">Metodo di riproduzione:%1$s</string>
     <string name="playback_info_direct_play">Riproduzione diretta</string>
+    <plurals name="incomplete_series_progress">
+        <item quantity="one">%1$d di %2$d episodio da vedere</item>
+        <item quantity="many">%1$d di %2$d episodi da vedere</item>
+        <item quantity="other">%1$d di %2$d episodi da vedere</item>
+    </plurals>
+    <plurals name="incomplete_series_progress_with_last">
+        <item quantity="one">Ultimo visto %1$s • %2$d di %3$d episodio da vedere</item>
+        <item quantity="many">Ultimo visto %1$s • %2$d di %3$d episodi da vedere</item>
+        <item quantity="other">Ultimo visto %1$s • %2$d di %3$d episodi da vedere</item>
+    </plurals>
 </resources>
