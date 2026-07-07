@@ -38,20 +38,29 @@ import org.jellyfin.androidtv.ui.browsing.MainActivity
 import org.jellyfin.androidtv.ui.itemhandling.ItemLauncher
 import org.jellyfin.androidtv.ui.navigation.Destinations
 import org.jellyfin.androidtv.ui.navigation.NavigationRepository
+import org.jellyfin.androidtv.ui.playback.ExternalPlayerActivity
 import org.jellyfin.androidtv.ui.playback.MediaManager
+import org.jellyfin.androidtv.ui.playback.VideoQueueManager
 import org.jellyfin.androidtv.ui.startup.fragment.SelectServerFragment
 import org.jellyfin.androidtv.ui.startup.fragment.ServerFragment
 import org.jellyfin.androidtv.ui.startup.fragment.SplashFragment
 import org.jellyfin.androidtv.ui.startup.fragment.StartupToolbarFragment
+import org.jellyfin.androidtv.util.PlaybackHelper
 import org.jellyfin.androidtv.util.applyTheme
 import org.jellyfin.androidtv.util.createBundle
+import org.jellyfin.androidtv.util.apiclient.Response
 import org.jellyfin.sdk.api.client.ApiClient
 import org.jellyfin.sdk.api.client.extensions.userLibraryApi
+import org.jellyfin.sdk.model.api.BaseItemDto
+import org.jellyfin.sdk.model.api.BaseItemKind
 import org.jellyfin.sdk.model.serializer.toUUIDOrNull
 import org.koin.android.ext.android.inject
 import org.koin.androidx.viewmodel.ext.android.viewModel
 import timber.log.Timber
 import java.util.UUID
+import android.net.Uri
+import kotlin.coroutines.resume
+import kotlin.coroutines.suspendCoroutine
 
 class StartupActivity : FragmentActivity() {
 	companion object {
@@ -70,6 +79,8 @@ class StartupActivity : FragmentActivity() {
 	private val navigationRepository: NavigationRepository by inject()
 	private val externalCatalogRepository: org.jellyfin.androidtv.data.repository.ExternalCatalogRepository by inject()
 	private val itemLauncher: ItemLauncher by inject()
+	private val playbackHelper: org.jellyfin.androidtv.util.PlaybackHelper by inject()
+	private val videoQueueManager: org.jellyfin.androidtv.ui.playback.VideoQueueManager by inject()
 	private val workManager: WorkManager by inject()
 	private val socketListener: SocketHandler by inject()
 
@@ -160,6 +171,65 @@ class StartupActivity : FragmentActivity() {
 
 			// Update WebSockets
 			launch { socketListener.updateSession() }
+		}
+
+		// VLC check for Projectivy Launcher
+		val vlcPackage = "org.videolan.vlc"
+		val isVlcInstalled = runCatching { packageManager.getPackageInfo(vlcPackage, 0) }.isSuccess
+
+		if (isVlcInstalled) {
+			// External Item redirect to VLC
+			if (itemId == null && externalId != null) {
+				val externalItem = withContext(Dispatchers.IO) {
+					val catalog = externalCatalogRepository.loadHomeCatalog(500)
+					val newReleases = externalCatalogRepository.loadNewReleases(limit = 100)
+					(catalog + newReleases).find { it.stableId == externalId }
+				}
+
+				if (externalItem != null && !externalItem.streamUrl.isNullOrBlank()) {
+					Timber.i("Redirecting external item ${externalItem.title} directly to VLC")
+					val vlcIntent = Intent(Intent.ACTION_VIEW).apply {
+						setPackage(vlcPackage)
+						setDataAndType(Uri.parse(externalItem.streamUrl), "video/*")
+						putExtra("title", externalItem.title)
+						addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+					}
+					startActivity(vlcIntent)
+					finish()
+					return
+				}
+			}
+
+			// Local Item redirect to VLC
+			if (itemId != null && !itemIsUserView) {
+				val item = withContext(Dispatchers.IO) {
+					api.userLibraryApi.getItem(itemId = itemId).content
+				}
+
+				if (item.type == BaseItemKind.MOVIE || item.type == BaseItemKind.EPISODE) {
+					Timber.i("Redirecting local item ${item.name} directly to VLC")
+					val itemsToPlay = suspendCoroutine<List<BaseItemDto>> { continuation ->
+						playbackHelper.getItemsToPlay(this@StartupActivity, item, false, false, object : Response<List<BaseItemDto>>() {
+							override fun onResponse(response: List<BaseItemDto>) {
+								continuation.resume(response)
+							}
+						})
+					}
+
+					if (itemsToPlay.isNotEmpty()) {
+						videoQueueManager.setCurrentVideoQueue(itemsToPlay)
+						videoQueueManager.setCurrentMediaPosition(0)
+
+						val intent = Intent(this@StartupActivity, ExternalPlayerActivity::class.java).apply {
+							putExtra(ExternalPlayerActivity.EXTRA_FORCE_VLC, true)
+							putExtra(ExternalPlayerActivity.EXTRA_POSITION, 0L)
+						}
+						startActivity(intent)
+						finish()
+						return
+					}
+				}
+			}
 		}
 
 		if (itemId == null && externalId != null) {
