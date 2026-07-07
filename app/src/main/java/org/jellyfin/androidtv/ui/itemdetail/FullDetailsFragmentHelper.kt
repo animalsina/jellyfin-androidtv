@@ -17,6 +17,8 @@ import org.jellyfin.androidtv.ui.navigation.Destinations
 import org.jellyfin.androidtv.ui.navigation.NavigationRepository
 import org.jellyfin.androidtv.ui.playback.TrailerWebViewActivity
 import org.jellyfin.androidtv.streaming.StreamingAvailabilityHelper
+import org.jellyfin.androidtv.ui.presentation.CardPresenter
+import org.jellyfin.androidtv.ui.presentation.MutableObjectAdapter
 import org.jellyfin.androidtv.util.TimeUtils
 import org.jellyfin.androidtv.util.apiclient.getSeriesOverview
 import org.jellyfin.androidtv.util.popupMenu
@@ -88,12 +90,6 @@ fun FullDetailsFragment.showDetailsMenu(
 
 	if (trailerButton?.isVisible == false) {
 		item(getString(R.string.lbl_play_trailers)) { playTrailers() }
-	}
-
-	if (streamingAvailabilityButton?.isVisible == false) {
-		item(getString(R.string.lbl_streaming_availability)) {
-			StreamingAvailabilityHelper.openAvailabilityMenu(requireContext(), mBaseItem)
-		}
 	}
 
 	if (favButton?.isVisible == false) {
@@ -413,5 +409,34 @@ fun FullDetailsFragment.getLiveTvChannel(
 		}.onSuccess { channel ->
 			callback(channel)
 		}
+	}
+}
+
+fun FullDetailsFragment.addStreamingAvailabilityRow(
+	adapter: MutableObjectAdapter<androidx.leanback.widget.Row>
+) {
+	val externalCatalogRepository by inject<org.jellyfin.androidtv.data.repository.ExternalCatalogRepository>()
+
+	lifecycleScope.launch {
+		val title = if (mBaseItem.type == BaseItemKind.EPISODE) mBaseItem.seriesName ?: mBaseItem.name else mBaseItem.name
+		if (title.isNullOrBlank()) return@launch
+
+		val matches = withContext(Dispatchers.IO) {
+			runCatching { externalCatalogRepository.findFreeCatalogMatches(title) }
+				.getOrDefault(emptyList())
+		}
+
+		if (matches.isEmpty()) return@launch
+
+		val cardPresenter = CardPresenter(true, org.jellyfin.androidtv.constant.ImageType.POSTER, 140)
+		val rowAdapter = MutableObjectAdapter<Any>(cardPresenter)
+		matches.forEach { rowAdapter.add(org.jellyfin.androidtv.ui.itemhandling.ExternalCatalogBaseRowItem(it)) }
+
+		adapter.add(
+			androidx.leanback.widget.ListRow(
+				androidx.leanback.widget.HeaderItem(getString(R.string.lbl_streaming_availability)),
+				rowAdapter
+			)
+		)
 	}
 }

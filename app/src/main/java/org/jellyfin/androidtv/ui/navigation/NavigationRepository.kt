@@ -57,6 +57,11 @@ interface NavigationRepository {
 	 * Reset navigation to the initial destination or a specific [Destination.Fragment] without clearing history.
 	 */
 	fun reset(destination: Destination.Fragment? = null) = reset(destination, false)
+
+	/**
+	 * Returns the current fragment destination.
+	 */
+	val currentFragment: Destination.Fragment?
 }
 
 class NavigationRepositoryImpl(
@@ -80,6 +85,9 @@ class NavigationRepositoryImpl(
 	}
 
 	override val canGoBack: Boolean get() = fragmentHistory.isNotEmpty()
+
+	override val currentFragment: Destination.Fragment?
+		get() = fragmentHistory.lastOrNull() ?: defaultDestination
 
 	override fun goBack(): Boolean {
 		if (fragmentHistory.empty()) return false

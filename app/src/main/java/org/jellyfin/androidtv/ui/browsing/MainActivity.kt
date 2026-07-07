@@ -31,6 +31,7 @@ import org.jellyfin.androidtv.ui.background.AppBackground
 import org.jellyfin.androidtv.ui.base.JellyfinTheme
 import org.jellyfin.androidtv.ui.base.ProvideLocalInteractionTracker
 import org.jellyfin.androidtv.ui.composable.compat.AppNavigationHost
+import org.jellyfin.androidtv.ui.navigation.Destinations
 import org.jellyfin.androidtv.ui.navigation.NavigationRepository
 import org.jellyfin.androidtv.ui.screensaver.InAppScreensaver
 import org.jellyfin.androidtv.ui.settings.compat.MainActivitySettings
@@ -130,7 +131,7 @@ class MainActivity : FragmentActivity() {
 	}
 
 	private fun handleBackToExit(): Boolean {
-		if (navigationRepository.canGoBack) return false
+		if (navigationRepository.canGoBack || navigationRepository.currentFragment != Destinations.home) return false
 
 		val now = SystemClock.uptimeMillis()
 		if (now <= exitPromptUntil && exitPromptDialog?.isShowing == true) {

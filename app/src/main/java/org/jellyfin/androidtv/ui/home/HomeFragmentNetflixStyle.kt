@@ -104,9 +104,6 @@ class HomeFragmentNetflixStyle : Fragment() {
 	private lateinit var previewPoster: AsyncImageView
 	private lateinit var contentView: FragmentContainerView
 	private lateinit var previewSubtitle: TextView
-	private lateinit var previewActions: LinearLayout
-	private lateinit var previewPlayButton: Button
-	private lateinit var previewMoreInfoButton: Button
 
 	// Trailer
 	private lateinit var trailerContainer: FrameLayout
@@ -172,9 +169,6 @@ class HomeFragmentNetflixStyle : Fragment() {
 		previewPoster = view.findViewById(R.id.preview_poster)
 		contentView = view.findViewById(R.id.content_view)
 		previewSubtitle = view.findViewById(R.id.preview_subtitle)
-		previewActions = view.findViewById(R.id.preview_actions)
-		previewPlayButton = view.findViewById(R.id.preview_play_button)
-		previewMoreInfoButton = view.findViewById(R.id.preview_more_info_button)
 
 		// Trailer container sopra il previewBackground
 		trailerContainer = view.findViewById<FrameLayout>(R.id.trailer_container).apply {
@@ -245,7 +239,7 @@ class HomeFragmentNetflixStyle : Fragment() {
 
 	private fun setupRowsFragmentListener() {
 		homePreviewViewModel.selectedItem
-			.flowWithLifecycle(viewLifecycleOwner.lifecycle, Lifecycle.State.STARTED)
+			.flowWithLifecycle(viewLifecycleOwner.lifecycle, Lifecycle.State.RESUMED)
 			.onEach { item -> updatePreviewSection(item) }
 			.launchIn(viewLifecycleOwner.lifecycleScope)
 	}
@@ -262,7 +256,7 @@ class HomeFragmentNetflixStyle : Fragment() {
 		}
 
 		currentPreviewItem = item
-		configurePreviewActions(item)
+		// configurePreviewActions(item)
 		val baseItem = item.baseItem
 		val nextItemId = baseItem.id.toString()
 		val changedItem = currentPreviewItemId != nextItemId
@@ -855,21 +849,7 @@ class HomeFragmentNetflixStyle : Fragment() {
 
 
 	private fun configurePreviewActions(item: BaseRowItem) {
-		val baseItem = item.baseItem
-		if (baseItem == null) {
-			previewActions.visibility = View.GONE
-			return
-		}
-
-		previewActions.visibility = View.VISIBLE
-		previewPlayButton.setOnClickListener {
-			if (item is ExternalCatalogBaseRowItem) ExternalCatalogLauncher.open(requireContext(), item)
-			else keyProcessor.handleKey(KeyEvent.KEYCODE_MEDIA_PLAY, item, activity)
-		}
-		previewMoreInfoButton.setOnClickListener {
-			if (item is ExternalCatalogBaseRowItem) ExternalCatalogLauncher.open(requireContext(), item)
-			else navigationRepository.navigate(Destinations.itemDetails(baseItem.id))
-		}
+		// Buttons removed as per user request (unreachable and take too much space)
 	}
 
 
@@ -907,7 +887,6 @@ class HomeFragmentNetflixStyle : Fragment() {
 		previewDuration.visibility = View.GONE
 		previewAgeRating.visibility = View.GONE
 		previewSubtitle.visibility = View.GONE
-		previewActions.visibility = View.GONE
 		resetTrailerTimer()
 	}
 
@@ -1000,8 +979,17 @@ class HomeFragmentNetflixStyle : Fragment() {
 
 	override fun onPause() {
 		if (::trailerWebView.isInitialized) {
+			trailerWebView.stopLoading()
 			trailerWebView.onPause()
+			trailerWebView.loadUrl("about:blank")
 		}
+		// Cancel any pending backdrop or trailer jobs
+		previewBackdropJob?.cancel()
+		trailerJob?.cancel()
+		trailerSearchCall?.cancel()
+
+		// Clear selection and backdrop to free memory while in details screen
+		resetPreview()
 		super.onPause()
 	}
 

@@ -655,6 +655,7 @@ class LeanbackChannelWorker(
 		}
 		return PreviewProgram.Builder()
 			.setChannelId(ContentUris.parseId(channelUri))
+			.setInternalProviderId(item.stableId.toString())
 			.setType(
 				when (item.type) {
 					BaseItemKind.SERIES -> WatchNextPrograms.TYPE_TV_SERIES
@@ -672,6 +673,8 @@ class LeanbackChannelWorker(
 			)
 			.setIntent(Intent(context, StartupActivity::class.java).apply {
 				item.localItemId?.let { putExtra(StartupActivity.EXTRA_ITEM_ID, it.toString()) }
+				putExtra(StartupActivity.EXTRA_EXTERNAL_ID, item.stableId.toString())
+				putExtra(StartupActivity.EXTRA_PROVIDER_ID, item.providerId)
 			})
 			.build()
 			.toContentValues()
@@ -795,6 +798,7 @@ class LeanbackChannelWorker(
 
 		return PreviewProgram.Builder()
 			.setChannelId(ContentUris.parseId(channelUri))
+			.setInternalProviderId(item.id.toString())
 			.setType(
 				when (item.type) {
 					BaseItemKind.SERIES -> WatchNextPrograms.TYPE_TV_SERIES

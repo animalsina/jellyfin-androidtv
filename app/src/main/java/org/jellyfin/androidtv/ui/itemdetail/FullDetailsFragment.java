@@ -557,6 +557,7 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
                 ItemRowAdapter similarMoviesAdapter = new ItemRowAdapter(requireContext(), BrowsingUtils.createSimilarItemsRequest(mBaseItem.getId()), QueryType.SimilarMovies, new CardPresenter(), adapter);
                 addItemRow(adapter, similarMoviesAdapter, 5, getString(R.string.lbl_more_like_this));
 
+                addStreamingAvailabilityRow(adapter);
                 addInfoRows(adapter);
                 break;
             case TRAILER:
@@ -570,6 +571,7 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
                 //Similar
                 ItemRowAdapter similarTrailerAdapter = new ItemRowAdapter(requireContext(), BrowsingUtils.createSimilarItemsRequest(mBaseItem.getId()), QueryType.SimilarMovies, new CardPresenter(), adapter);
                 addItemRow(adapter, similarTrailerAdapter, 4, getString(R.string.lbl_more_like_this));
+                addStreamingAvailabilityRow(adapter);
                 addInfoRows(adapter);
                 break;
             case PERSON:
@@ -610,6 +612,7 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
 
                 ItemRowAdapter similarAdapter = new ItemRowAdapter(requireContext(), BrowsingUtils.createSimilarItemsRequest(mBaseItem.getId()), QueryType.SimilarSeries, new CardPresenter(), adapter);
                 addItemRow(adapter, similarAdapter, 4, getString(R.string.lbl_more_like_this));
+                addStreamingAvailabilityRow(adapter);
                 break;
 
             case EPISODE:
@@ -644,12 +647,18 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
                     addItemRow(adapter, chapterAdapter, 1, getString(R.string.lbl_chapters));
                 }
 
+                addStreamingAvailabilityRow(adapter);
                 addInfoRows(adapter);
                 break;
 
             default:
+                addStreamingAvailabilityRow(adapter);
                 addInfoRows(adapter);
         }
+    }
+
+    private void addStreamingAvailabilityRow(MutableObjectAdapter<Row> adapter) {
+        FullDetailsFragmentHelperKt.addStreamingAvailabilityRow(this, adapter);
     }
 
     private void addInfoRows(MutableObjectAdapter<Row> adapter) {
@@ -763,7 +772,6 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
     TextUnderButton moreButton;
     TextUnderButton playButton = null;
     TextUnderButton trailerButton = null;
-    TextUnderButton streamingAvailabilityButton = null;
 
     private void addButtons(int buttonSize) {
         BaseItemDto baseItem = mBaseItem;
@@ -866,16 +874,6 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
             });
 
             mDetailsOverviewRow.addAction(trailerButton);
-        }
-
-        if (StreamingAvailabilityHelper.shouldOfferAvailabilityButton(requireContext(), mBaseItem)) {
-            streamingAvailabilityButton = TextUnderButton.create(requireContext(), R.drawable.ic_search, buttonSize, 0, getString(R.string.lbl_streaming_availability), new View.OnClickListener() {
-                @Override
-                public void onClick(View v) {
-                    StreamingAvailabilityHelper.openAvailabilityMenu(requireContext(), mBaseItem);
-                }
-            });
-            mDetailsOverviewRow.addAction(streamingAvailabilityButton);
         }
 
         if (mProgramInfo != null && Utils.canManageRecordings(KoinJavaComponent.<UserRepository>get(UserRepository.class).getCurrentUser().getValue())) {
@@ -1139,7 +1137,6 @@ public class FullDetailsFragment extends Fragment implements RecordingIndicatorV
         // added in order of priority (should match res/menu/menu_details_more.xml)
         if (queueButton != null) actionsList.add(queueButton);
         if (trailerButton != null) actionsList.add(trailerButton);
-        if (streamingAvailabilityButton != null) actionsList.add(streamingAvailabilityButton);
         if (shuffleButton != null) actionsList.add(shuffleButton);
         if (favButton != null) actionsList.add(favButton);
         if (goToSeriesButton != null) actionsList.add(goToSeriesButton);

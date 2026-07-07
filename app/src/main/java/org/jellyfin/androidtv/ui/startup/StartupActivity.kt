@@ -58,6 +58,8 @@ class StartupActivity : FragmentActivity() {
 		const val EXTRA_ITEM_ID = "ItemId"
 		const val EXTRA_ITEM_IS_USER_VIEW = "ItemIsUserView"
 		const val EXTRA_HIDE_SPLASH = "HideSplash"
+		const val EXTRA_EXTERNAL_ID = "ExternalId"
+		const val EXTRA_PROVIDER_ID = "ProviderId"
 	}
 
 	private val startupViewModel: StartupViewModel by viewModel()
@@ -66,6 +68,7 @@ class StartupActivity : FragmentActivity() {
 	private val sessionRepository: SessionRepository by inject()
 	private val userRepository: UserRepository by inject()
 	private val navigationRepository: NavigationRepository by inject()
+	private val externalCatalogRepository: org.jellyfin.androidtv.data.repository.ExternalCatalogRepository by inject()
 	private val itemLauncher: ItemLauncher by inject()
 	private val workManager: WorkManager by inject()
 	private val socketListener: SocketHandler by inject()
@@ -141,8 +144,9 @@ class StartupActivity : FragmentActivity() {
 			else -> intent.getStringExtra(EXTRA_ITEM_ID)
 		}?.toUUIDOrNull()
 		val itemIsUserView = intent.getBooleanExtra(EXTRA_ITEM_IS_USER_VIEW, false)
+		val externalId = intent.getStringExtra(EXTRA_EXTERNAL_ID)?.toUUIDOrNull()
 
-		Timber.i("Determining next activity (action=${intent.action}, itemId=$itemId, itemIsUserView=$itemIsUserView)")
+		Timber.i("Determining next activity (action=${intent.action}, itemId=$itemId, itemIsUserView=$itemIsUserView, externalId=$externalId)")
 
 		// Update background worker
 		with(ProcessLifecycleOwner.get().lifecycleScope) {
@@ -156,6 +160,21 @@ class StartupActivity : FragmentActivity() {
 
 			// Update WebSockets
 			launch { socketListener.updateSession() }
+		}
+
+		if (itemId == null && externalId != null) {
+			val externalItem = withContext(Dispatchers.IO) {
+				val catalog = externalCatalogRepository.loadHomeCatalog(500)
+				val newReleases = externalCatalogRepository.loadNewReleases(limit = 100)
+				(catalog + newReleases).find { it.stableId == externalId }
+			}
+
+			if (externalItem != null) {
+				withContext(Dispatchers.Main) {
+					org.jellyfin.androidtv.streaming.ExternalCatalogLauncher.open(this@StartupActivity, org.jellyfin.androidtv.ui.itemhandling.ExternalCatalogBaseRowItem(externalItem))
+				}
+				// We don't finish here because we want the main app to be in background or at home
+			}
 		}
 
 		// Create destination

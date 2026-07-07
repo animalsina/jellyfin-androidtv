@@ -204,45 +204,6 @@
                     android:ellipsize="end"
                     android:lineSpacingMultiplier="1.2"
                     android:layout_marginTop="16dp" />
-
-                <!-- Action Buttons -->
-                <LinearLayout
-                    android:id="@+id/preview_actions"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:layout_marginTop="24dp"
-                    android:visibility="gone">
-
-                    <Button
-                        android:id="@+id/preview_play_button"
-                        android:layout_width="wrap_content"
-                        android:layout_height="52dp"
-                        android:text="@string/lbl_play"
-                        android:paddingStart="32dp"
-                        android:paddingEnd="32dp"
-                        android:textSize="18sp"
-                        android:fontFamily="sans-serif-medium"
-                        android:textAllCaps="false"
-                        android:textColor="@color/button_glass_text_light"
-                        android:background="@drawable/button_glass_light"
-                        android:layout_marginEnd="16dp"
-                        style="@style/Widget.AppCompat.Button" />
-
-                    <Button
-                        android:id="@+id/preview_more_info_button"
-                        android:layout_width="wrap_content"
-                        android:layout_height="52dp"
-                        android:text="@string/lbl_more_info"
-                        android:paddingStart="24dp"
-                        android:paddingEnd="24dp"
-                        android:textSize="18sp"
-                        android:fontFamily="sans-serif-medium"
-                        android:textAllCaps="false"
-                        android:textColor="@color/button_glass_text_dark"
-                        android:background="@drawable/button_glass_dark"
-                        style="@style/Widget.AppCompat.Button" />
-                </LinearLayout>
             </LinearLayout>
 
             <!-- Preview Image (positioned to the right) -->

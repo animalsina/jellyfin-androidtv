@@ -162,7 +162,7 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 	private fun scheduleSelectedPreview(item: BaseRowItem) {
 		selectedPreviewJob?.cancel()
 		selectedPreviewJob = lifecycleScope.launch {
-			delay(240)
+			delay(350) // Increased debounce to reduce load during fast scrolling
 			if (currentItem !== item) return@launch
 			backgroundService.setBackground(item.baseItem)
 			homePreviewViewModel.updateSelectedItem(item)
@@ -228,11 +228,12 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 			if (id == View.NO_ID) id = View.generateViewId()
 			setOnKeyListener(this@HomeRowsFragment)
 			setOnKeyInterceptListener(homeRowsKeyInterceptListener)
-			// Keep more card views attached/cached on Android TV. It reduces the visible "empty card
-			// then image" effect when landing on home and makes row-to-row D-pad movement smoother.
-			setItemViewCacheSize(72)
-			isNestedScrollingEnabled = true
+			// Keep card view cache small. Too large causes visible stalls during vertical scroll
+			// as Leanback tries to keep dozens of complex Compose-based cards in memory.
+			setItemViewCacheSize(3)
+			isNestedScrollingEnabled = false
 			isVerticalScrollBarEnabled = true
+			setHasFixedSize(true)
 
 			if (useTouchHomeNavigation) {
 				// Phones/tablets must use normal RecyclerView touch scrolling. The root cause of the
@@ -606,9 +607,6 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 		if (baseItem.type in PLAYABLE_CONTEXT_TYPES) {
 			menu.menu.add(0, MENU_HOME_PLAY_NOW, order++, R.string.lbl_home_card_play_now)
 		}
-		if (StreamingAvailabilityHelper.shouldOfferAvailabilityButton(activity, baseItem)) {
-			menu.menu.add(0, MENU_HOME_WHERE_TO_WATCH, order++, R.string.lbl_home_card_where_to_watch)
-		}
 		baseItem.name?.takeIf { it.isNotBlank() }?.let {
 			menu.menu.add(0, MENU_HOME_SEARCH_SERVER, order++, R.string.lbl_home_card_search_server)
 		}
@@ -621,10 +619,6 @@ class HomeRowsFragment : RowsSupportFragment(), AudioEventListener, View.OnKeyLi
 					true
 				}
 				MENU_HOME_PLAY_NOW -> keyProcessor.handleKey(KeyEvent.KEYCODE_MEDIA_PLAY, item, activity)
-				MENU_HOME_WHERE_TO_WATCH -> {
-					StreamingAvailabilityHelper.openAvailabilityMenu(activity, baseItem)
-					true
-				}
 				MENU_HOME_SEARCH_SERVER -> {
 					navigationRepository.navigate(Destinations.search(baseItem.name.orEmpty()))
 					true

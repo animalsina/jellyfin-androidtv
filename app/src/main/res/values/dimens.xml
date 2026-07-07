@@ -12,7 +12,7 @@
     <fraction name="lb_focus_zoom_factor_large">@fraction/card_scale_focus</fraction>
 
     <!-- Home screen preview section -->
-    <dimen name="home_preview_height">240dp</dimen>
+    <dimen name="home_preview_height">170dp</dimen>
     <dimen name="home_preview_width">600dp</dimen>
 
     <!-- Netflix-style row spacing -->

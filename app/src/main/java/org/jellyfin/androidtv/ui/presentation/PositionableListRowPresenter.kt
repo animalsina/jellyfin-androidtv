@@ -25,7 +25,7 @@ class PositionableListRowPresenter : CustomListRowPresenter {
 		if (holder !is ViewHolder) return
 
 		viewHolder = holder
-		
+
 		// Add horizontal spacing between items
 		val spacingInPixels = TypedValue.applyDimension(
 			TypedValue.COMPLEX_UNIT_DIP,
@@ -33,6 +33,8 @@ class PositionableListRowPresenter : CustomListRowPresenter {
 			holder.view.context.resources.displayMetrics
 		).toInt()
 		holder.gridView?.setItemSpacing(spacingInPixels)
+		holder.gridView?.setItemViewCacheSize(6)
+		holder.gridView?.setHasFixedSize(true)
 
 		if (TouchNavigationHelper.shouldUseTouchHomeNavigation(holder.view.context)) {
 			// Horizontal Leanback rows also own a selectedPosition. On touch devices this selection
